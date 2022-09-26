@@ -12,7 +12,7 @@ import seaborn as sn
 import matplotlib.pyplot as plt
 import os, sys
 sys.path.insert(0, 'starter-code/')
-import utils, constants
+import utils, constants, statistics
 
 #----------------------------------------------------------------
 # Load in Raw Datasets as is
@@ -31,24 +31,36 @@ dev_data   = load_data( "data/dev_x.csv",   "data/dev_y.csv"   )
 test_data  = load_data( "data/test_x.csv")
 
 #----------------------------------------------------------------
-# Calculate Descriptives (R)
+# Calculate length of sentences - statistcs
 #----------------------------------------------------------------
-library(pacman); pacman::p_load(data.table, tidyverse, magrittr, ggplot2)
+# TRAIN ------------
+# Mean length of sentence
+results_t = []
+for i in range( len( train_data[0] ) ):
+  results_t.append( len( train_data[0][i] ) )
 
-# Load data and remove "start", "stop"
-train = fread( "data/train_x.csv" )[ word != "-DOCSTART-" & word != "<STOP>" ]
-# turn words to lower case
-train[, word := tolower(word)]
-# remove punctuations
-train$word = gsub('[[:punct:] ]+', NA, train$word)
-# get frequency
-freq = train %>% group_by(word) %>% tally() %>% arrange(desc(n)) %>% data.table
-# plot
-ggplot(freq[0:50], aes(x = word, y = n)) + geom_bar(stat = 'identity') + coord_flip()
+# take mean
+statistics.mean(results_t)
+
+# take median
+statistics.median(results_t)
+
+# DEV ---------------
+# Mean length of sentence
+results_d = []
+for i in range( len( dev_data[0] ) ):
+  results_d.append( len( dev_data[0][i] ) )
+
+# take mean
+statistics.mean(results_d)
+
+# take median
+statistics.median(results_d)
 
 
-
-
+#----------------------------------------------------------------
+# Calculate Number of characters - statistcs
+#----------------------------------------------------------------
 
 
 

@@ -1,7 +1,14 @@
+#----------------------------------------------------------------
+# 1- Import Libraries + helper files
+#----------------------------------------------------------------
 library(pacman); pacman::p_load(data.table, tidyverse, magrittr, 
                                 ggplot2, forcats)
 
-# Training ---------------------------------------------
+#----------------------------------------------------------------
+# 2- Calculate Word Frequency
+#----------------------------------------------------------------
+
+# Training ------
 
 train = fread(
         "data/train_x.csv"
@@ -27,7 +34,7 @@ ggplot(
   coord_flip() + theme_minimal() +
   ggtitle("Word Frequency in Training")
 
-# DEV ---------------------------------------------------
+# DEV ---------
 
 dev = fread(
   "data/dev_x.csv"
@@ -53,7 +60,7 @@ ggplot(
   coord_flip() + theme_minimal() +
   ggtitle("Word Frequency in Development")
 
-# Combine two graphs -----------------------------------
+# Combine two graphs --------
 
 grid.arrange(
   ggplot(
@@ -78,7 +85,11 @@ grid.arrange(
   
 )
 
+#----------------------------------------------------------------
+# 3- Calculate Mean/Median Length of sentences
+#----------------------------------------------------------------
 
+# TRAIN -----
 
 
 
