@@ -1,0 +1,97 @@
+---
+title: "Tables HW1"
+format: pdf
+editor: visual
+---
+
+```{r}
+#| echo: false
+library(pacman);
+p_load(data.table, knitr, tidyverse, kableExtra)
+```
+
+```{r}
+#| echo: false
+#| results: asis
+
+      kable(  
+      data.table(
+        
+          `Classifier` = c(
+                        "Word Count",
+                        "Char. Count"
+                      ),
+          `Mean` = c(
+                        503,
+                        "2,252"
+                        ),
+          `Median` = c(
+                        278,
+                        "1,255"
+                        ),
+          `Mean ` = c(
+                        527,
+                        "2,354"
+                        ),
+          `Median ` = c(
+                        293,
+                        "1,364"
+                        ),
+          `Mean  ` = c(
+                       512, 
+                       "2,270" 
+                       ),
+          `Median  ` = c(
+                         264, 
+                         "1,184"
+                         )
+          
+        ),
+      caption = "Summary Statistics Before Preprocessing", escape = F, booktabs = T
+      ) %>% add_header_above(c(" " = 1,"Train" = 2, "Dev" = 2, "Test" = 2))
+```
+
+
+
+
+
+```{r}
+#| echo: false
+#| results: asis
+
+      kable(  
+      data.table(
+        
+          `Classifier` = c(
+                        "Word Count",
+                        "Char. Count"
+                      ),
+          `Mean` = c(
+                      "438" ,
+                        "2,145"
+                        ),
+          `Median` = c(
+                      "240" ,
+                        "1,203"
+                        ),
+          `Mean ` = c(
+                      "459" ,
+                        "2,243"
+                        ),
+          `Median ` = c(
+                      "255"  ,
+                        "1,291"
+                        ),
+          `Mean  ` = c(
+                      "443" , 
+                       "2,158" 
+                       ),
+          `Median  ` = c(
+                      "230"   , 
+                         "1,133"
+                         )
+          
+        ),
+      caption = "Summary Statistics After Preprocessing", escape = F, booktabs = T
+      ) %>% add_header_above(c(" " = 1,"Train" = 2, "Dev" = 2, "Test" = 2))
+```

@@ -28,7 +28,7 @@ def evaluate(data, model):
     n = len(sentences)
     k = n//processes
     n_tokens = sum([len(d) for d in sentences])
-    unk_n_tokens = sum([1 for s in sentences for w in s if w not in model.word2idx.keys()])
+    # unk_n_tokens = sum([1 for s in sentences for w in s if w not in model.word2idx.keys()])
     predictions = {i:None for i in range(n)}
     probabilities = {i:None for i in range(n)}
          
@@ -56,7 +56,7 @@ def evaluate(data, model):
 
 
     token_acc = sum([1 for i in range(n) for j in range(len(sentences[i])) if tags[i][j] == predictions[i][j]]) / n_tokens
-    unk_token_acc = sum([1 for i in range(n) for j in range(len(sentences[i])) if tags[i][j] == predictions[i][j] and sentences[i][j] not in model.word2idx.keys()]) / unk_n_tokens
+    # unk_token_acc = sum([1 for i in range(n) for j in range(len(sentences[i])) if tags[i][j] == predictions[i][j] and sentences[i][j] not in model.word2idx.keys()]) / unk_n_tokens
     whole_sent_acc = 0
     num_whole_sent = 0
     for k in range(n):
@@ -72,7 +72,7 @@ def evaluate(data, model):
     print("Whole sent acc: {}".format(whole_sent_acc/num_whole_sent))
     print("Mean Probabilities: {}".format(sum(probabilities.values())/n))
     print("Token acc: {}".format(token_acc))
-    print("Unk token acc: {}".format(unk_token_acc))
+    # print("Unk token acc: {}".format(unk_token_acc))
     
     confusion_matrix(pos_tagger.tag2idx, pos_tagger.idx2tag, predictions.values(), tags, 'cm.png')
 
@@ -82,6 +82,7 @@ def evaluate(data, model):
 class POSTagger():
     def __init__(self):
         """Initializes the tagger model parameters and anything else necessary. """
+        # self.word2idx = pos_tagger.word2idx
         pass
     
     
@@ -186,12 +187,11 @@ class POSTagger():
     def sequence_probability(self, sequence, tags):
         """Computes the probability of a tagged sequence given the emission/transition probabilities.
         """
-        self.sequence = np.array(["I", "am", "happy"])
+        self.sequence = sequence    # np.array(["I", "am", "happy"])
         
-
-
         ## TODO
         return 0. 
+        pass
 
     def inference(self, sequence):
         """Tags a sequence with part of speech tags.
@@ -203,40 +203,46 @@ class POSTagger():
             - decoding with beam search
             - viterbi
         """
+        # if method == viterbi:
         idxseq = []
         for word in sequence:
             idxseq.append(self.word2idx[word])
-        x, T1, T2 = viterbi(idxseq,self.bigrams, self.lexical)
+        x, T1, T2 = viterbi(idxseq, self.bigrams, self.lexical)
         ret = []
         for tag in x:
             ret.append(self.idx2tag[tag])
         return ret
+        # elif method == "greedy":
+            # Greedy Encoding Here
+        # else:
+            # Beam Search Decoding here
 
 if __name__ == "__main__":
 
     pos_tagger = POSTagger()
 
     train_data = load_data("data/train_x.csv", "data/train_y.csv")
-    # dev_data = load_data("data/dev_x.csv", "data/dev_y.csv")
+    dev_data = load_data("data/dev_x.csv", "data/dev_y.csv")
     # test_data = load_data("data/test_x.csv")
 
-    pos_tagger.train(train_data)
+    pos_tagger.train(dev_data)
 
     # Printing/Testing ----------------------------------------------
-
-
-    pos_tagger.get_emissions(); pos_tagger.get_bigrams()
+    pos_tagger.get_emissions(); pos_tagger.get_bigrams(); 
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
 
-    pos_tagger.inference(["-docstart-", "Fed", "raises", "interest", "<STOP>"])
-    # print( pos_tagger.inference(["-docstart-", "My", "book", "is", "<STOP>"]) )
-    # print(pos_tagger.data)
-    # Check that probs add up to 1
-    print( pos_tagger.inference(["-docstart-", "Fed", "raises", "interest", "<STOP>"]).argmax() )
-    # print( pos_tagger.trigrams.sum(axis = 2, keepdims = True) )
+    # confusion_matrix(
+    #     tag2idx = pos_tagger.tag2idx,
+    #     idx2tag = pos_tagger.idx2tag, 
+    #     pred = [ pos_tagger.inference(train_data[0][i]) for i in range( len( train_data[0] ))],
+    #     gt = train_data[1],
+    #     fname = "test1"
+    # )
 
-    print( viterbi( y = pos_tagger.unigrams, A = pos_tagger.bigrams, B = pos_tagger.lexical ) )
-
+    print(evaluate( 
+        dev_data,
+        pos_tagger
+     ))
     #  End of Testing -----------------------------------------------   
 
     # Experiment with your decoder using greedy decoding, beam search, viterbi...

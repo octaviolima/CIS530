@@ -439,8 +439,17 @@ class POSTagger():
             - decoding with beam search
             - viterbi
         """
-        ## TODO
-        return []
+        # if method == viterbi:
+        idxseq = []
+        for word in sequence:
+            idxseq.append(self.word2idx[word])
+        x, T1, T2 = viterbi(idxseq, self.bigrams, self.lexical)
+        ret = []
+        for tag in x:
+            ret.append(self.idx2tag[tag])
+        return ret
+        
+      
       
 
 train_data = load_data("/Users/octavioelias/Documents/_fall22/_hw2/data/train_x.csv","/Users/octavioelias/Documents/_fall22/_hw2/data/train_y.csv")
@@ -450,9 +459,37 @@ pos_tagger.train(train_data)
 
 pos_tagger.get_emissions(); pos_tagger.get_bigrams(); pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
 
-# pos_tagger.unigrams
-# pos_tagger.bigrams
-pos_tagger.bigrams
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
