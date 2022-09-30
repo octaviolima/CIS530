@@ -4,6 +4,9 @@ import numpy as np
 import seaborn as sn
 import matplotlib.pyplot as plt
 from constants import *
+from math import log
+from numpy import array
+from numpy import argmax
 
 
 def infer_sentences(model, sentences, start):
@@ -181,3 +184,101 @@ def viterbi(y, A, B, Pi=None):
     print([T2.argmax(), T1.argmax()])
     return x, T1, T2
 
+def trigram_to_bigram(trigram):
+    bigram = np.empty((trigram.shape[0]*trigram.shape[1], trigram.shape[2]))
+    for i in range(trigram.shape[0]):
+        for j in range(trigram.shape[1]):
+            bigram[i*trigram.shape[0] + j] = trigram[i,j,:]
+    return bigram
+
+def get_index(tag1, tag2, tag2idx):
+    idx1 = tag2idx[tag1]
+    idx2 = tag2idx[tag2]
+    n = len(tag2idx.keys()) 
+    return idx1*n + idx2
+    
+def viterbi(y, A, B, tag2idx, Pi = None):
+    # y : array (T,)
+    #     Observation state sequence. int dtype.
+    # A : array (K, K, K )
+    #     State transition matrix. See HiddenMarkovModel.state_transition  for
+    #     details.
+    # B : array (K, M)
+    #     Emission matrix. See HiddenMarkovModel.emission for details.
+    # Pi: optional, (K,)
+    #     Initial state probabilities: Pi[i] is the probability x[0] == i. If
+    #     None, uniform initial distribution is assumed (Pi[:] == 1/K).
+    print(np.argmax(B[:,y[-1]]))
+    possible_states = A.shape[0]**2
+    N = A.shape[0]
+    length_of_sentence = len(y)
+    v = np.zeros((possible_states,length_of_sentence))
+    bp = np.zeros((possible_states,length_of_sentence))
+    double_start_index = get_index("O","O",tag2idx)
+    v[double_start_index,0] = 1
+    has_values = [(tag2idx["O"])]
+    print(tag2idx)
+    for i in range(1, length_of_sentence):
+        new_has_values = []
+        for value2 in has_values:
+            emissions = B[:,y[i]]
+
+            transition = A[:,value2,:]
+            print(transition[:,tag2idx["<STOP>"]])
+            index_values = [value2 + N*exponent for exponent in range(N)]
+            prev = [v[val, i-1] for val in index_values]
+            for n,x in enumerate(prev):
+                transition[n] = transition[n]* x
+            print(transition[:,tag2idx["<STOP>"]])
+            v[value2*N:(value2+1)*N,i] = emissions * np.max(transition,0)
+            
+            bp[value2*N:(value2+1)*N,i] = np.argmax(transition,0)
+            for prob_i,prob in enumerate(emissions * np.max(transition,0)):
+                if prob > .0000001:
+                    new_has_values.append(prob_i)
+        print(y[i], new_has_values)
+        has_values = new_has_values
+            
+    ret = np.zeros(length_of_sentence)
+    actualret = np.zeros(length_of_sentence)
+    ret[-1] = int(np.argmax(v[:,length_of_sentence-1]))
+    print(ret)
+    actualret[-1] = ret[-1]//N
+    for i in reversed(range(1,length_of_sentence)):
+        ret[i-1] = v[int(ret[i] * N),i]
+    print(ret)
+    
+
+def deleted_interpolation(unigram_c, bigram_c, trigram_c):
+    lambda1 = 0
+    lambda2 = 0
+    lambda3 = 0
+        
+    for a in range(len(pos_tagger.trigrams)):
+        for b in range(len(pos_tagger.trigrams)):
+            for c in range(len(pos_tagger.trigrams)):
+                v = pos_tagger.trigrams[(a, b, c)]
+                if v > 0:
+                    try:
+                        c1 = float( v-1 ) / ( pos_tagger.bigrams[(a, b)]-1 )
+                    except ZeroDivisionError:
+                        c1 = 0
+                    try:
+                        c2 = float( pos_tagger.bigrams[(a, b)]-1 ) / ( pos_tagger.unigrams.sum(axis = 1)[(a,)]-1 ) 
+                    except ZeroDivisionError:
+                        c2 = 0
+                    try:
+                        c3 = float( pos_tagger.unigrams.sum(axis = 1)[(a,)]-1 ) / pos_tagger.unigrams.sum(axis = 1).sum(axis = 0) - 1 
+                    except ZeroDivisionError:
+                        c3 = 0
+         
+                    k = np.argmax([c1, c2, c3])
+                    if k == 0:
+                        lambda3 += v
+                    if k == 1:
+                        lambda2 += v
+                    if k == 2:
+                        lambda1 += v
+  
+    weights = [lambda1, lambda2, lambda3]
+    norm_w = [float(a)/sum(weights) for a in weights]

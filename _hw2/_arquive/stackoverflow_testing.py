@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 # from constants import *
 np.set_printoptions(suppress=True) # disable scientific notation
 
+
+
 def infer_sentences(model, sentences, start):
     """
 
@@ -223,15 +225,69 @@ def viterbi(y, A, B, Pi=None):
     # print(T2.argmax())
     return x, T1, T2
 
+# beam search
+def beam_search_decoder(data, k):
+  
+  idxseq = []
+  for word in data:
+      idxseq.append(pos_tagger.word2idx[word])
+  data = self.lexical[:, idxseq]
+
+  sequences = [[list(), 0.0]]
+  # walk over each step in sequence
+  for row in data:
+	  all_candidates = list()
+	  # expand each current candidate
+	  for i in range(len(sequences)):
+		  seq, score = sequences[i]
+	    for j in range(len(row)):
+	      candidate = [seq + [j], score - log(row[j])]
+		    all_candidates.append(candidate)
+	# order all candidates by score
+	ordered = sorted(all_candidates, key=lambda tup:tup[1])
+	# select k best
+	sequences = ordered[:k]
+  return sequences
 
 
+def greedy_decoder(data):
+  # Get columns in emission matrix that correspond to word(s)
+  idxseq = []
+  for word in data:
+    idxseq.append(pos_tagger.word2idx[word])
+  data = pos_tagger.lexical[:,idxseq]
+  # loop through columns to get index of highest value
+  pred_index = []
+  for i in range( data.shape[1] ):
+    pred_index.append( data[:,i].argmax() )
+  # Now that we have index of predicted tag, we get that tag
+  pred_tags = []
+  for i in pred_index:
+    pred_tags.append(pos_tagger.idx2tag[i])
+  return pred_tags
 
 
-
-
-
-
-
+    # beam search
+    def beam_search_decoder(data, k):
+        idxseq = []
+        for word in data:
+            idxseq.append(pos_tagger.word2idx[word])
+        data = pos_tagger.lexical[:,idxseq]
+        sequences = [[list(), 0.0]]
+        # walk over each step in sequence
+        for row in data:
+            all_candidates = list()
+            # expand each current candidate
+            for i in range(len(sequences)):
+                seq, score = sequences[i]
+                for j in range(len(row)):
+                    candidate = [seq + [j], score - log(row[j])]
+                    all_candidates.append(candidate)
+            # order all candidates by score
+            ordered = sorted(all_candidates, key=lambda tup:tup[1])
+            # select k best
+            sequences = ordered[:k]
+        return sequences
 
 
 # POS Tagger -------------------------------------------------------------------
@@ -245,7 +301,6 @@ import time
 
 def evaluate(data, model):
     """Evaluates the POS model on some sentences and gold tags.
-
     This model can compute a few different accuracies:
         - whole-sentence accuracy
         - per-token accuracy
@@ -317,6 +372,7 @@ def evaluate(data, model):
 class POSTagger():
     def __init__(self):
         """Initializes the tagger model parameters and anything else necessary. """
+        # self.word2idx = pos_tagger.word2idx
         pass
     
     
@@ -334,6 +390,8 @@ class POSTagger():
                 idx_first = self.tag2idx[pos_first]
                 idx_second = self.tag2idx[pos_second]
                 self.unigrams[idx_first,idx_second] += 1
+          # Do we need to normalize this by dividing each instance by sum of all cases
+          # self.unigrams = pos_tagger.unigrams / pos_tagger.unigrams[(a,)]-1
         pass
 
     def get_bigrams(self):        
@@ -398,6 +456,7 @@ class POSTagger():
         self.lexical = self.lexical + 0.000001
         # diving every row by its sum
         self.lexical = self.lexical / self.lexical.sum(axis = 1, keepdims = True)
+
         pass
 
     def train(self, data):
@@ -413,21 +472,18 @@ class POSTagger():
         self.idx2tag = {v:k for k,v in self.tag2idx.items()}
         self.all_words = list(set([word for sentence in self.data[0] for word in sentence]))
         self.word2idx = {self.all_words[i]:i for i in range(len(self.all_words))}
-        
-        # https://medium.com/analytics-vidhya/parts-of-speech-pos-and-viterbi-algorithm-3a5d54dfb346
-        # matrix_C = (best_probs), holds the intermediate optimal probabilities
-        # matrix D = (best_paths), the indices of the visited states\
-        
+        self.idx2word = {v:k for k,v in self.word2idx.items()}
+        # TODO
         pass
 
     def sequence_probability(self, sequence, tags):
         """Computes the probability of a tagged sequence given the emission/transition probabilities.
         """
-        self.sequence = np.array(["I", "am", "happy"])
-
-
+        self.sequence = sequence    # np.array(["I", "am", "happy"])
+        
         ## TODO
         return 0. 
+        pass
 
     def inference(self, sequence):
         """Tags a sequence with part of speech tags.
@@ -448,68 +504,84 @@ class POSTagger():
         for tag in x:
             ret.append(self.idx2tag[tag])
         return ret
+        # elif method == "greedy":
+            # Greedy Encoding Here
+        # else:
+            # Beam Search Decoding here
+            
+        def deleted_interpolation(unigram_c, bigram_c, trigram_c):
+         lambda1 = 0
+         lambda2 = 0
+         lambda3 = 0
         
+         for a, b, c in range(len(trigram_c)):
+             v = trigram_c[(a, b, c)]
+             if v > 0:
+                 try:
+                     c1 = float(v-1)/(bigram_c[(a, b)]-1)
+                 except ZeroDivisionError:
+                     c1 = 0
+                 try:
+                     c2 = float(bigram_c[(a, b)]-1)/(unigram_c[(a,)]-1)
+                 except ZeroDivisionError:
+                     c2 = 0
+                 try:
+                     c3 = float(unigram_c[(a,)]-1)/(sum(unigram_c.values())-1)
+                 except ZeroDivisionError:
+                     c3 = 0
       
-      
-
-train_data = load_data("/Users/octavioelias/Documents/_fall22/_hw2/data/train_x.csv","/Users/octavioelias/Documents/_fall22/_hw2/data/train_y.csv")
-
-pos_tagger = POSTagger()
-pos_tagger.train(train_data)
-
-pos_tagger.get_emissions(); pos_tagger.get_bigrams(); pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
-
-
+                 k = np.argmax([c1, c2, c3])
+                 if k == 0:
+                     lambda3 += v
+                 if k == 1:
+                     lambda2 += v
+                 if k == 2:
+                     lambda1 += v
   
+         weights = [lambda1, lambda2, lambda3]
+         norm_w = [float(a)/sum(weights) for a in weights]
+         deleted_interpolation()
 
+# if __name__ == "__main__":
 
+    pos_tagger = POSTagger()
 
+    train_data = load_data("data/train_x.csv", "data/train_y.csv")
+    dev_data = load_data("data/dev_x.csv", "data/dev_y.csv")
+    # test_data = load_data("data/test_x.csv")
 
+    pos_tagger.train(train_data)
 
+    # Printing/Testing ----------------------------------------------
+    pos_tagger.get_emissions(); pos_tagger.get_bigrams(); 
+    pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
 
+    # confusion_matrix(
+    #     tag2idx = pos_tagger.tag2idx,
+    #     idx2tag = pos_tagger.idx2tag, 
+    #     pred = [ pos_tagger.inference(train_data[0][i]) for i in range( len( train_data[0] ))],
+    #     gt = train_data[1],
+    #     fname = "test1"
+    # )
 
+    print(evaluate( 
+        dev_data,
+        pos_tagger
+     ))
+    #  End of Testing -----------------------------------------------   
 
+    # Experiment with your decoder using greedy decoding, beam search, viterbi...
 
+    # Here you can also implement experiments that compare different styles of decoding,
+    # smoothing, n-grams, etc.
+    # evaluate(dev_data, pos_tagger)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    # Predict tags for the test set
+    # test_predictions = []
+    # for sentence in test_data:
+    #     test_predictions.extend(pos_tagger.inference(sentence))
+    
+    # Write them to a file to update the leaderboard
+    # TODO
 
 

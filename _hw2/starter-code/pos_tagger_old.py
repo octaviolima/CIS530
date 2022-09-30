@@ -83,3 +83,8 @@ if __name__ == "__main__":
     
     # Write them to a file to update the leaderboard
     # TODO
+
+    v[:,i] = np.max(v[:,i-1] * A.T)
+
+    T1[:, i] = np.max(T1[:, i - 1] * A.T * B[np.newaxis, :, y[i]].T, 1)
+    T2[:, i] = np.argmax(T1[:, i - 1] * A.T, 1)
