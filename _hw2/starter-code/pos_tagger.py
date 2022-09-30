@@ -102,6 +102,8 @@ class POSTagger():
                 self.unigrams[idx_first,idx_second] += 1
         # Do we need to normalize this by dividing each instance by sum of all cases?????
         # self.unigrams = self.unigrams / self.unigrams.sum(axis = 1).sum(axis = 0)
+
+        # office hours: take log of probabilities
         pass
 
     def get_bigrams(self):        
@@ -120,7 +122,9 @@ class POSTagger():
                 idx_second = self.tag2idx[pos_second] 
                 self.bigrams[idx_first,idx_second] += 1
         # Smoothing: add 0.00001 to cells
-        self.bigrams = self.bigrams + 0.000001 
+        k = .000001 # try big range of values. .001, 2, 5 
+        self.bigrams = self.bigrams + k 
+        # 
         # diving every row by its sum
         self.bigrams = self.bigrams / self.bigrams.sum(axis = 1, keepdims = True)
         pass
@@ -133,7 +137,7 @@ class POSTagger():
         self.trigrams = np.zeros((len(self.all_tags), len(self.all_tags), len(self.all_tags)))
         for sentence_idx in range(len(self.data[0])):   
             sentence = self.data[1][sentence_idx]
-            sentence = ["O"] + sentence + ["<STOP>"]
+            sentence = ["O"] + sentence
             for word_idx in range(len(sentence) - 2):
                 pos_first = sentence[word_idx]
                 pos_second = sentence[word_idx + 1]
@@ -215,7 +219,7 @@ class POSTagger():
             idxseq = []
             for word in sequence:
                 idxseq.append(self.word2idx[word])
-            x, T1, T2 = viterbi(idxseq, self.trigrams, self.lexical, self.tag2idx)
+            x = viterbi(idxseq, self.trigrams, self.lexical, self.tag2idx,self.idx2word)
             for tag in x:
                 ret.append(self.idx2tag[tag])
             return ret
@@ -281,7 +285,7 @@ if __name__ == "__main__":
     # print(pos_tagger.trigrams[0,3,:])
     #print(pos_tagger.tag2idx.keys()) 
     print(pos_tagger.word2idx["<STOP>"])
-    pos_tagger.inference(["-docstart-","Fed","raised","interest","<STOP>"])
+    print(pos_tagger.inference(["-docstart-","Alex","was","on","the","big","red","house",".","<STOP>"]))
     
     # print(pos_tagger.lexical)
 
@@ -320,6 +324,10 @@ if __name__ == "__main__":
     # Write them to a file to update the leaderboard
     # TODO
 
+
+    #office hours: consider f score, 
+
+    #getting uknown words, prefix and suffix, feature engineering 
 
 
 
