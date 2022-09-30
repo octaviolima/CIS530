@@ -3,6 +3,7 @@ import numpy as np
 import time
 from utils import *
 np.set_printoptions(suppress=True) # disable scientific notation
+import string
 
 
 """ Contains the part of speech tagger class. """
@@ -176,7 +177,24 @@ class POSTagger():
         self.lexical = self.lexical / self.lexical.sum(axis = 0, keepdims = True)
 
         pass
+    def preprocessing(self,data):
+        sentence_data = data[0]
+        tag_data = data[1]
+        for i in range(len(sentence_data)):
+            sentence = sentence_data[i]
+            sentence_tags = tag_data[i]
+            
+            new_sentence = []
+            new_tags = []
+            for n,word in enumerate(sentence):
+                if word not in string.punctuation:
+                    new_sentence.append(word)
+                    new_tags.append(sentence_tags[n])
+            sentence_data[i] = new_sentence
+            tag_data[i] = new_tags
+        return [sentence_data,tag_data]
 
+    
     def train(self, data):
         """Trains the model by computing transition and emission probabilities.
 
@@ -184,7 +202,7 @@ class POSTagger():
             - smoothing.
             - N-gram models with varying N.
         """
-        self.data = data
+        self.data = self.preprocessing(data)
         self.all_tags = list(set([t for tag in data[1] for t in tag]))
         self.tag2idx = {self.all_tags[i]:i for i in range(len(self.all_tags))}
         self.idx2tag = {v:k for k,v in self.tag2idx.items()}
@@ -202,7 +220,8 @@ class POSTagger():
         ## TODO
         return 0. 
         pass
-
+    def is_punctuation(self,word):
+        return not word in string.punctuation
     def inference(self, sequence):
         """Tags a sequence with part of speech tags.
         You should implement different kinds of inference (suggested as separate
@@ -213,7 +232,8 @@ class POSTagger():
         """
         # 0 for viterbi, non-0 for greedy
         flag = 0
-        
+        sequence = list(filter(self.is_punctuation, sequence))
+        print(sequence)
         ret = []
         if flag == 0:
             idxseq = []
@@ -276,6 +296,7 @@ if __name__ == "__main__":
     train_data = load_data("data/train_x.csv", "data/train_y.csv")
     #dev_data = load_data("data/dev_x.csv", "data/dev_y.csv")
     # test_data = load_data("data/test_x.csv")
+    pos_tagger.preprocessing(train_data)
 
     pos_tagger.train(train_data)
 
@@ -284,8 +305,8 @@ if __name__ == "__main__":
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
     # print(pos_tagger.trigrams[0,3,:])
     #print(pos_tagger.tag2idx.keys()) 
-    print(pos_tagger.word2idx["<STOP>"])
-    print(pos_tagger.inference(["-docstart-","Alex","was","on","the","big","red","house",".","<STOP>"]))
+    print(pos_tagger.inference(["-docstart-","Fed","raised","interest","on","housing","<STOP>"]))
+    
     
     # print(pos_tagger.lexical)
 

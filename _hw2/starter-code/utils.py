@@ -201,6 +201,7 @@ def viterbi(y, A, B, tag2idx, idx2word,Pi = None):
     # Pi: optional, (K,)
     #     Initial state probabilities: Pi[i] is the probability x[0] == i. If
     #     None, uniform initial distribution is assumed (Pi[:] == 1/K).
+    debug = 1
     possible_states = A.shape[0]
     N = A.shape[0]
     length_of_sentence = len(y)
@@ -208,13 +209,15 @@ def viterbi(y, A, B, tag2idx, idx2word,Pi = None):
     bp = np.zeros((possible_states,possible_states, length_of_sentence))
     v[tag2idx["O"],tag2idx["O"],0] = 1
     has_values = [(tag2idx["O"],tag2idx["O"])]
-    print(tag2idx)
+    if debug:
+        print(tag2idx)
     for i in range(1, length_of_sentence):
         new_has_values = []
+        possible = []
         for value1,value2 in has_values:
             emissions = B[:,y[i]]
-
             transition = A[:,value2,:]
+
             # getting all memorized values in the form x,value2
             prev = v[:,value2, i-1] 
             for n,x in enumerate(prev):
@@ -222,11 +225,13 @@ def viterbi(y, A, B, tag2idx, idx2word,Pi = None):
             v[value2,:,i] = emissions * np.max(transition,0)
             bp[:,value2,i] = value1
             mean = np.mean(emissions * np.max(transition,0))
-            print(emissions * np.max(transition,0))
             for prob_i,prob in enumerate(emissions * np.max(transition,0)):
                 if prob/mean > 1:
                     new_has_values.append((value2,prob_i))
-        print(idx2word[y[i]], has_values)
+                    possible.append(prob_i)
+        if debug:
+            print(idx2word[y[i]], new_has_values)
+            print(emissions * np.max(transition,0), "\n" )
         has_values = new_has_values
     ret = np.zeros(length_of_sentence)
     ret[-1] = tag2idx["<STOP>"]
