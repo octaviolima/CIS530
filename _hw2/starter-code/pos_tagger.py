@@ -280,7 +280,9 @@ if __name__ == "__main__":
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
     # print(pos_tagger.trigrams[0,3,:])
     #print(pos_tagger.tag2idx.keys()) 
+    print(pos_tagger.word2idx["<STOP>"])
     pos_tagger.inference(["-docstart-","Fed","raised","interest","<STOP>"])
+    
     # print(pos_tagger.lexical)
 
     # pos_tagger.greedy_decoder()

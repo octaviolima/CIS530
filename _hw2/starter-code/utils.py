@@ -224,15 +224,16 @@ def viterbi(y, A, B, tag2idx, Pi = None):
             emissions = B[:,y[i]]
 
             transition = A[:,value2,:]
-            print(transition[:,tag2idx["<STOP>"]])
+            # print(transition[:,tag2idx["<STOP>"]])
             index_values = [value2 + N*exponent for exponent in range(N)]
             prev = [v[val, i-1] for val in index_values]
             for n,x in enumerate(prev):
                 transition[n] = transition[n]* x
-            print(transition[:,tag2idx["<STOP>"]])
+
             v[value2*N:(value2+1)*N,i] = emissions * np.max(transition,0)
             
             bp[value2*N:(value2+1)*N,i] = np.argmax(transition,0)
+            print(np.max(transition,0)[tag2idx["<STOP>"]])
             for prob_i,prob in enumerate(emissions * np.max(transition,0)):
                 if prob > .0000001:
                     new_has_values.append(prob_i)
