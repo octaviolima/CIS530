@@ -101,7 +101,7 @@ class POSTagger():
                 idx_second = self.tag2idx[pos_second]
                 self.unigrams[idx_first,idx_second] += 1
         # Do we need to normalize this by dividing each instance by sum of all cases?????
-        # self.unigrams = self.unigrams / self.unigrams.sum(axis = 1).sum(axis = 0)
+        self.unigrams = self.unigrams / self.unigrams.sum(axis = 1).sum(axis = 0)
 
         # office hours: take log of probabilities
         pass
@@ -211,8 +211,8 @@ class POSTagger():
             - decoding with beam search
             - viterbi
         """
-        # 0 for viterbi, non-0 for greedy
-        flag = 0
+        # 0 for viterbi, 1 for greedy
+        flag = 1
         
         ret = []
         if flag == 0:
@@ -224,48 +224,21 @@ class POSTagger():
                 ret.append(self.idx2tag[tag])
             return ret
         # GREEDY
-        if flag != 0:
+        if flag == 1:
             idxseq = []
-            for word in data:
+            for word in sequence:
                 idxseq.append(self.word2idx[word])
-                data = self.lexical[:,idxseq]
-                # loop through columns to get index of highest value
-                pred_index = []
-                for i in range( data.shape[1] ):
-                    pred_index.append( data[:,i].argmax() )
-                # Now that we have index of predicted tag, we get that tag
-                pred_tags = []
-                for i in pred_index:
-                    pred_tags.append(self.idx2tag[i])
-                # Return predicted tags
-                return pred_tags
-
-    # def viterbi(self, sequence):
-    #     idxseq = []
-    #     for word in sequence:
-    #         idxseq.append(self.word2idx[word])
-    #     x, T1, T2 = viterbi(idxseq, self.trigrams, self.lexical, self.tag2idx)
-    #     ret = []
-    #     for tag in x:
-    #         ret.append(self.idx2tag[tag])
-    #     return ret
-
-    # def greedy_decoder(self, data):
-    #     # Get columns in emission matrix that correspond to word(s)
-    #     idxseq = []
-    #     for word in data:
-    #         idxseq.append(self.word2idx[word])
-    #     data = self.lexical[:,idxseq]
-    #     # loop through columns to get index of highest value
-    #     pred_index = []
-    #     for i in range( data.shape[1] ):
-    #         pred_index.append( data[:,i].argmax() )
-    #     # Now that we have index of predicted tag, we get that tag
-    #     pred_tags = []
-    #     for i in pred_index:
-    #         pred_tags.append(self.idx2tag[i])
-    #     # Return predicted tags
-    #     return pred_tags
+            data = self.lexical[:,idxseq]
+            # loop through columns to get index of highest value
+            pred_index = []
+            for i in range( data.shape[1] ):
+                pred_index.append( data[:,i].argmax() )
+            # Now that we have index of predicted tag, we get that tag
+            pred_tags = []
+            for i in pred_index:
+                pred_tags.append(self.idx2tag[i])
+            # Return predicted tags
+            return pred_tags
 
 
 
@@ -284,17 +257,30 @@ if __name__ == "__main__":
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
     # print(pos_tagger.trigrams[0,3,:])
     #print(pos_tagger.tag2idx.keys()) 
-    print(pos_tagger.word2idx["<STOP>"])
-    print(pos_tagger.inference(["-docstart-","Alex","was","on","the","big","red","house",".","<STOP>"]))
+    # print(pos_tagger.word2idx["<STOP>"])
+    # print(pos_tagger.inference(train_data[0]))
+    print(pos_tagger.inference(["the","house","."]))
     
-    # print(pos_tagger.lexical)
+    print(
+        linear_interpolation( pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams )
+    )
 
-    # pos_tagger.greedy_decoder()
+    # from sklearn.metrics import precision_recall_fscore_support as score
+    # predicted = [pos_tagger.inference( train_data[0][i]) for i in range(len(train_data[0])) ]
+    # actual = train_data[1]
+    # predicted = [item for sublist in predicted for item in sublist]
+    # actual = [item for sublist in actual for item in sublist]
+    # precision, recall, fscore, support = score(actual, predicted)
+    # import statistics
+    # print("The average Precision across all individual tags is", round( statistics.mean(precision), 3) )
+    # print("The average Recall is ", round( statistics.mean(recall), 3))
+    # print("And the average fscore is ", round( statistics.mean(fscore), 3))
 
-    # print(
-    #     pos_tagger.inference(["-docstart-","Fed","raised","interest","<STOP>"])
-    #     )
-    # )
+
+    print(
+        pos_tagger.inference(["-docstart-","Fed","raised","interest","<STOP>"])
+        )
+    
 
     # evaluate(
     #     train_data,
@@ -331,25 +317,3 @@ if __name__ == "__main__":
 
 
 
-    ###### OBSOLETE #######
-    # beam search
-    # def beam_search_decoder(data, k, self):
-    #     idxseq = []
-    #     for word in data:
-    #         idxseq.append(self.word2idx[word])
-    #     data = self.lexical[:,idxseq]
-    #     sequences = [[list(), 0.0]]
-    #     # walk over each step in sequence
-    #     for row in data:
-    #         all_candidates = list()
-    #         # expand each current candidate
-    #         for i in range(len(sequences)):
-    #             seq, score = sequences[i]
-    #             for j in range(len(row)):
-    #                 candidate = [seq + [j], score - log(row[j])]
-    #                 all_candidates.append(candidate)
-    #         # order all candidates by score
-    #         ordered = sorted(all_candidates, key=lambda tup:tup[1])
-    #         # select k best
-    #         sequences = ordered[:k]
-    #     return sequences
