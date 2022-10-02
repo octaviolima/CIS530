@@ -241,7 +241,7 @@ class POSTagger():
             - viterbi
         """
         # GREEDY = 0; BEAM_1 = 1; BEAM_2 = 2; BEAM_3 = 3; VITERBI2 = 4; VITERBI3 = 5
-        flag = BEAM_2
+        flag = VITERBI2
 
         # GREEDY
         if flag == GREEDY:
@@ -352,15 +352,15 @@ class POSTagger():
 
         # VITERBI
         ret = []
-        if flag == 3 or flag == 4:
+        if flag == VITERBI2 or flag == VITERBI3:
             idxseq = []
             for word in sequence:
                 idxseq.append(self.word2idx[word])
             # Bigram Viterbi
-            if flag == 3:
+            if flag == VITERBI2:
                 x = viterbi2(idxseq, self.bigrams, self.lexical, self.tag2idx)
             # Trigram Viterbi
-            elif flag == 4:
+            elif flag == VITERBI3:
                 x = viterbi3(idxseq, self.trigrams, self.lexical, self.tag2idx, self.idx2word, self.idx2tag)
 
             for tag in x:
@@ -385,23 +385,23 @@ if __name__ == "__main__":
     pos_tagger.get_emissions(); pos_tagger.get_bigrams(); 
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
     
-    # print(pos_tagger.inference(["-docstart-","house",".","<STOP>"]))
+    print(pos_tagger.inference(["-docstart-","house",".","<STOP>"]))
 
 
-    from sklearn.metrics import precision_recall_fscore_support as score
-    predicted = [pos_tagger.inference( train_data[0][i]) for i in range(len(train_data[0])) ]
-    actual = train_data[1]
-    predicted = [item for sublist in predicted for item in sublist]
-    actual = [item for sublist in actual for item in sublist]
-    precision, recall, fscore, support = score(actual, predicted)
-    import statistics
-    print("The average Precision across all individual tags is", round( statistics.mean(precision), 3) )
-    print("The average Recall is ", round( statistics.mean(recall), 3))
-    print("And the average fscore is ", round( statistics.mean(fscore), 3))
+    # from sklearn.metrics import precision_recall_fscore_support as score
+    # predicted = [pos_tagger.inference( train_data[0][i]) for i in range(len(train_data[0])) ]
+    # actual = train_data[1]
+    # predicted = [item for sublist in predicted for item in sublist]
+    # actual = [item for sublist in actual for item in sublist]
+    # precision, recall, fscore, support = score(actual, predicted)
+    # import statistics
+    # print("The average Precision across all individual tags is", round( statistics.mean(precision), 3) )
+    # print("The average Recall is ", round( statistics.mean(recall), 3))
+    # print("And the average fscore is ", round( statistics.mean(fscore), 3))
 
-    print("Beam 1 Results on Train")
+    print("")
     evaluate( 
-        train_data,
+        [train_data[0][0:10], train_data[1][0:10]],
         # train_data,
         pos_tagger
      )
