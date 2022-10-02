@@ -166,26 +166,21 @@ def viterbi2(y, A, B,tag2idx):
     N = len(y)
     v = np.zeros((num_tags, N))
     bp = np.zeros((num_tags, N))
-
     # Initilaize the tracking tables from first observation
-    v[tag2idx["O"]:0] = 1
-
+    v[tag2idx["O"],0] = 1
     # Iterate throught the observations updating the tracking tables
     for i in range(1, N):
-        # emissions = B[:,y[i]]
-        # prev = v[:,i-1]
-        # transition = np.copy(A)
-        # for n,x in enumerate(prev):
-        #     transition[n] = transition[n] 
-        v[:, i] = np.max(v[:, i - 1] * A.T * B[np.newaxis, :, y[i]].T, 1)
-        bp[:, i] = np.argmax(bp[:, i - 1] * A.T, 1)
+        emissions = B[np.newaxis,:,y[i]]
+        prev = v[:,i-1]
+        transition = A
+        v[:, i] = np.max(prev * transition.T * emissions.T, 1)
+        bp[:, i] = np.argmax(prev * transition.T, 1)
 
     # Build the output, optimal model trajectory
     x = np.zeros(N)
     x[-1] = np.argmax(v[:, N - 1])
     for i in reversed(range(1, N)):
         x[i - 1] = bp[int(x[i]), i]
-    print(x)
     return x
 
 def get_index(tag1, tag2, tag2idx):
@@ -205,7 +200,7 @@ def viterbi3(y, A, B, tag2idx, idx2word, idx2tag):
     # Pi: optional, (K,)
     #     Initial state probabilities: Pi[i] is the probability x[0] == i. If
     #     None, uniform initial distribution is assumed (Pi[:] == 1/K).
-    # debug = 1
+    debug = 1
     possible_states = A.shape[0]
     N = A.shape[0]
     length_of_sentence = len(y)
@@ -256,7 +251,6 @@ def viterbi3(y, A, B, tag2idx, idx2word, idx2tag):
     for i in reversed(range(1,length_of_sentence)):
         ret[i-1] = int(curr)
         curr = int(bp[0,curr,i])
-    print("hey2")
     return ret
     
 
