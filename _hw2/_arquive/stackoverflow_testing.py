@@ -620,28 +620,96 @@ class POSTagger():
     
     
     
+    def inference(sequence):
+        """Tags a sequence with part of speech tags.
+        You should implement different kinds of inference (suggested as separate
+        methods):
+            - greedy decoding
+            - decoding with beam search
+            - viterbi
+        """
+        # GREEDY = 0 BEAM = 1; BEAM_K = 2 VITERBI = 2
+        GREEDY = 0
+        flag = GREEDY
+        # GREEDY
+        if flag == GREEDY:
+            idxseq = []
+            for word in sequence:
+                idxseq.append(self.word2idx[word])
+            data = self.lexical[:,idxseq]
+            # loop through columns to get index of highest value
+            pred_index = []
+            for i in range( data.shape[1] ):
+                pred_index.append( data[:,i].argmax() )
+            # Now that we have index of predicted tag, we get that tag
+            pred_tags = []
+            for i in pred_index:
+                pred_tags.append(self.idx2tag[i])
+            # Return predicted tags
+            return pred_tags
+        # VITERBI
+        ret = []
+        if flag == VITERBI:
+            idxseq = []
+            for word in sequence:
+                idxseq.append(self.word2idx[word])
+            x = viterbi2(idxseq, self.trigrams, self.lexical, self.tag2idx)
+            for tag in x:
+                ret.append(self.idx2tag[tag])
+            return ret
     
-    
-    
-    
-  # def greedy_decoder(data):
-  #       for idxseq in data:
-  #          # Get columns in emission matrix that correspond to word(s)
-  #          idxseq = []
-  #          for word in data:
-  #              idxseq.append(pos_tagger.word2idx[word])
-  #          data = pos_tagger.lexical[:,idxseq]
-  #          # loop through columns to get index of highest value
-  #          pred_index = []
-  #          for i in range( data.shape[1] ):
-  #              pred_index.append( data[:,i].argmax() )
-  #          # Now that we have index of predicted tag, we get that tag
-  #          pred_tags = []
-  #          for i in pred_index:
-  #              pred_tags.append(pos_tagger.idx2tag[i])
-  #          # Return predicted tags
-  #          print(pred_tags)
-  #       print(pred_tags)
+      
+      
+def subcategorize(sequence):
+    idxseq = []
+    for word in sequence:
+      # if word doesnt exist in train dataset
+      if (word in pos_tagger.all_words) == False:
+          if re.search(r'\d', word):
+              print( '_NUM_' )
+          elif re.search(r'(ion\b|ty\b|ics\b|ment\b|ence\b|ance\b|ness\b|ist\b|ism\b)',word):
+              print( '_NOUNLIKE_' )
+          elif re.search(r'(ate\b|fy\b|ize\b|\ben|\bem|ing\b)', word):
+              print( '_VERBLIKE_' )
+          elif re.search(r'(\bun|\bin|ble\b|ry\b|ish\b|ious\b|ical\b|\bnon)',word):
+              print( '_ADJLIKE_' )
+          else:
+              print( '_RARE_' )
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

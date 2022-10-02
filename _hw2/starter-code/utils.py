@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 from tqdm import tqdm 
 import numpy as np
@@ -129,68 +130,71 @@ def confusion_matrix(tag2idx,idx2tag, pred, gt, fname):
     sn.heatmap(df_cm, annot=False)
     plt.savefig(fname)
 
-# def viterbi(y, A, B, Pi=None):
-#     """
-#     Return the MAP estimate of state trajectory of Hidden Markov Model.
+def viterbi2(y, A, B,tag2idx):
+    """
+    Return the MAP estimate of state trajectory of Hidden Markov Model.
 
-#     Parameters
-#     ----------
-#     y : array (T,)
-#         Observation state sequence. int dtype.
-#     A : array (K, K)
-#         State transition matrix. See HiddenMarkovModel.state_transition  for
-#         details.
-#     B : array (K, M)
-#         Emission matrix. See HiddenMarkovModel.emission for details.
-#     Pi: optional, (K,)
-#         Initial state probabilities: Pi[i] is the probability x[0] == i. If
-#         None, uniform initial distribution is assumed (Pi[:] == 1/K).
+    Parameters
+    ----------
+    y : array (T,)
+        Observation state sequence. int dtype.
+    A : array (K, K)
+        State transition matrix. See HiddenMarkovModel.state_transition  for
+        details.
+    B : array (K, M)
+        Emission matrix. See HiddenMarkovModel.emission for details.
+    Pi: optional, (K,)
+        Initial state probabilities: Pi[i] is the probability x[0] == i. If
+        None, uniform initial distribution is assumed (Pi[:] == 1/K).
 
-#     Returns
-#     -------
-#     x : array (T,)
-#         Maximum a posteriori probability estimate of hidden state trajectory,
-#         conditioned on observation sequence y under the model parameters A, B,
-#         Pi.
-#     T1: array (K, T)
-#         the probability of the most likely path so far
-#     T2: array (K, T)
-#         the x_j-1 of the most likely path so far
-#     """
-#     # Turn (47,47) diagonal array into (47,)
-#     # y = y.sum(axis = 1, keepdims=True).squeeze()
-#     # Cardinality of the state space
-#     K = A.shape[0]
-#     # Initialize the priors with default (uniform dist) if not given by caller
-#     Pi = Pi if Pi is not None else np.full(K, 1 / K)
-#     T = len(y)
-#     T1 = np.empty((K, T), 'd')
-#     T2 = np.empty((K, T), 'B')
+    Returns
+    -------
+    x : array (T,)
+        Maximum a posteriori probability estimate of hidden state trajectory,
+        conditioned on observation sequence y under the model parameters A, B,
+        Pi.
+    T1: array (K, T)
+        the probability of the most likely path so far
+    T2: array (K, T)
+        the x_j-1 of the most likely path so far
+    """
+    # Turn (47,47) diagonal array into (47,)
+    # y = y.sum(axis = 1, keepdims=True).squeeze()
+    # Cardinality of the state space
+    num_tags = A.shape[0]
+    # Initialize the priors with default (uniform dist) if not given by caller
+    N = len(y)
+    v = np.zeros((num_tags, N))
+    bp = np.zeros((num_tags, N))
 
-#     # Initilaize the tracking tables from first observation
-#     T1[:, 0] = Pi * B[:, y[0]]
-#     T2[:, 0] = 0
+    # Initilaize the tracking tables from first observation
+    v[tag2idx["O"]:0] = 1
 
-#     # Iterate throught the observations updating the tracking tables
-#     for i in range(1, T):
-#         T1[:, i] = np.max(T1[:, i - 1] * A.T * B[np.newaxis, :, y[i]].T, 1)
-#         T2[:, i] = np.argmax(T1[:, i - 1] * A.T, 1)
+    # Iterate throught the observations updating the tracking tables
+    for i in range(1, N):
+        # emissions = B[:,y[i]]
+        # prev = v[:,i-1]
+        # transition = np.copy(A)
+        # for n,x in enumerate(prev):
+        #     transition[n] = transition[n] 
+        v[:, i] = np.max(v[:, i - 1] * A.T * B[np.newaxis, :, y[i]].T, 1)
+        bp[:, i] = np.argmax(bp[:, i - 1] * A.T, 1)
 
-#     # Build the output, optimal model trajectory
-#     x = np.empty(T, 'B')
-#     x[-1] = np.argmax(T1[:, T - 1])
-#     for i in reversed(range(1, T)):
-#         x[i - 1] = T2[x[i], i]
-#     print([T2.argmax(), T1.argmax()])
-#     return x, T1, T2
+    # Build the output, optimal model trajectory
+    x = np.zeros(N)
+    x[-1] = np.argmax(v[:, N - 1])
+    for i in reversed(range(1, N)):
+        x[i - 1] = bp[int(x[i]), i]
+    print(x)
+    return x
 
-# def get_index(tag1, tag2, tag2idx):
-#     idx1 = tag2idx[tag1]
-#     idx2 = tag2idx[tag2]
-#     n = len(tag2idx.keys()) 
-#     return idx1*n + idx2
+def get_index(tag1, tag2, tag2idx):
+    idx1 = tag2idx[tag1]
+    idx2 = tag2idx[tag2]
+    n = len(tag2idx.keys()) 
+    return idx1*n + idx2
     
-def viterbi(y, A, B, tag2idx, idx2word,Pi = None):
+def viterbi3(y, A, B, tag2idx, idx2word, idx2tag):
     # y : array (T,)
     #     Observation state sequence. int dtype.
     # A : array (K, K, K )
@@ -210,23 +214,38 @@ def viterbi(y, A, B, tag2idx, idx2word,Pi = None):
     has_values = [(tag2idx["O"],tag2idx["O"])]
     print(tag2idx)
     for i in range(1, length_of_sentence):
-        new_has_values = []
+        new_has_values = set()
+        possible = set()
         for value1,value2 in has_values:
-            emissions = B[:,y[i]]
 
+            # emissions = B[:,y[i]]
+            # transition = np.copy(A[:,value2,:])
+            # # # getting all memorized values in the form x,value2
+            # prev = v[:,value2, i-1] 
+            # for n,x in enumerate(prev):
+            #     transition[n] = transition[n]* x
+            
+            # v[value2,:,i] = emissions * np.max(transition,0)
+            # bp[:,value2,i] = value1
+            # mean = np.mean(emissions * np.max(transition,0))
+            # for prob_i,prob in enumerate(emissions * np.max(transition,0)):
+            #     if prob/mean > 1:
+            #         new_has_values.add((value2,prob_i))
+            #         possible.add(prob_i)
+            emissions = B[np.newaxis,:,y[i]]
             transition = A[:,value2,:]
-            # getting all memorized values in the form x,value2
             prev = v[:,value2, i-1] 
-            for n,x in enumerate(prev):
-                transition[n] = transition[n]* x
-            v[value2,:,i] = emissions * np.max(transition,0)
-            bp[:,value2,i] = value1
-            mean = np.mean(emissions * np.max(transition,0))
-            print(emissions * np.max(transition,0))
-            for prob_i,prob in enumerate(emissions * np.max(transition,0)):
+            v[value2,:,i] = np.max(prev * transition.T * emissions.T, 1)
+            bp[value2,:,i] = np.argmax(prev * transition.T, 1)
+            # print(np.max(prev * transition.T * emissions.T, 1))
+            mean = np.mean(prev * transition.T * emissions.T)
+            for prob_i,prob in enumerate(np.max(prev * transition.T * emissions.T,1)):
                 if prob/mean > 1:
-                    new_has_values.append((value2,prob_i))
-        print(idx2word[y[i]], has_values)
+                    new_has_values.add((value2,prob_i))
+                    possible.add(prob_i)
+        if len(has_values) == 1:
+            print( np.max(transition,0))
+        print(idx2word[i],[(idx2tag[valu[0]],idx2tag[valu[1]]) for valu in has_values], [idx2tag[valu] for valu in possible])
         has_values = new_has_values
     ret = np.zeros(length_of_sentence)
     ret[-1] = tag2idx["<STOP>"]
@@ -234,6 +253,7 @@ def viterbi(y, A, B, tag2idx, idx2word,Pi = None):
     for i in reversed(range(1,length_of_sentence)):
         ret[i-1] = int(curr)
         curr = int(bp[0,curr,i])
+    print("hey2")
     return ret
     
 
@@ -272,6 +292,31 @@ def linear_interpolation(unigram_c, bigram_c, trigram_c):
     norm_w = [float(a)/sum(weights) for a in weights]
     return [norm_w, weights]
 
+
+
+def subcategorize(sequence, all_words):
+    # Loop thru each word in sentence
+    idxseq = []
+    for word in sequence:
+      # if word doesnt exist in train dataset, give it a *_like tag
+      if (word in all_words) == False:
+            # if word is a digit
+            if re.search(r'\d', word):
+                print( 'CD' )
+            # if word has ending that looks like noun
+            elif re.search(r'(ion\b|ty\b|ics\b|ment\b|ence\b|ance\b|ness\b|ist\b|ism\b)', word):
+                print( 'NN' )
+            # if word looks like a verb in its past form
+            # elif re.search(r'(ate\b|fy\b|ize\b|\ben|\bem|ing\b)', word):
+                # print( '' )
+            # if word looks like a verb in the gerund form
+                # print( '' )
+            # if word's ending looks like an adjective
+            elif re.search(r'(\bun|\bin|ble\b|ry\b|ish\b|ious\b|ical\b|\bnon)', word):
+                print( '_ADJLIKE_' )
+            # if none of the above
+            else:
+                print( '_RARE_' )
 
 
 

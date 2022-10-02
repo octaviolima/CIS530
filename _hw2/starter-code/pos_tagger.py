@@ -22,7 +22,7 @@ def evaluate(data, model):
     As per the write-up, you may find it faster to use multiprocessing (code included). 
     
     """
-    processes = 4
+    processes = 1
     sentences = data[0]
     tags = data[1]
     n = len(sentences)
@@ -30,29 +30,37 @@ def evaluate(data, model):
     n_tokens = sum([len(d) for d in sentences])
     # unk_n_tokens = sum([1 for s in sentences for w in s if w not in model.word2idx.keys()])
     predictions = {i:None for i in range(n)}
-    probabilities = {i:None for i in range(n)}
+    probabilities = {i:0 for i in range(n)}
          
     start = time.time()
-    pool = Pool(processes=processes)
-    res = []
-    for i in range(0, n, k):
-        res.append(pool.apply_async(infer_sentences, [model, sentences[i:i+k], i]))
-    ans = [r.get(timeout=None) for r in res]
-    predictions = dict()
-    for a in ans:
-        predictions.update(a)
-    print(f"Inference Runtime: {(time.time()-start)/60} minutes.")
+    ans = []
+    for i in range(0,n):
+        predictions[i] = model.inference(sentences[i])
+    # start = time.time()
+    # pool = Pool(processes=processes)
+    # res = []
+    # for i in range(0, n, k):
+    #     res.append(pool.apply_async(infer_sentences, [model, sentences[i:i+k], i]))
+    # ans = [r.get(timeout=None) for r in res]
     
-    start = time.time()
-    pool = Pool(processes=processes)
-    res = []
-    for i in range(0, n, k):
-        res.append(pool.apply_async(compute_prob, [model, sentences[i:i+k], tags[i:i+k], i]))
-    ans = [r.get(timeout=None) for r in res]
-    probabilities = dict()
-    for a in ans:
-        probabilities.update(a)
-    print(f"Probability Estimation Runtime: {(time.time()-start)/60} minutes.")
+    # predictions = dict()
+    
+    # for a in ans:
+    #     predictions.update(a)
+    
+    print(f"Inference Runtime: {round((time.time()-start)/60, 3)} minutes.")
+    
+    # start = time.time()
+    # pool = Pool(processes=processes)
+    # res = []
+    # for i in range(0, n, k):
+    #     print(i)
+    #     res.append(pool.apply_async(compute_prob, [model, sentences[i:i+k], tags[i:i+k], i]))
+    # ans = [r.get(timeout=None) for r in res]
+    # probabilities = dict()
+    # for a in ans:
+    #     probabilities.update(a)
+    # print(f"Probability Estimation Runtime: {round( (time.time()-start)/60, 3)} minutes.")
 
 
     token_acc = sum([1 for i in range(n) for j in range(len(sentences[i])) if tags[i][j] == predictions[i][j]]) / n_tokens
@@ -69,9 +77,9 @@ def evaluate(data, model):
             num_whole_sent += 1
             start_idx = end_idx+1
             end_idx = eos_idxes[i]
-    print("Whole sent acc: {}".format(whole_sent_acc/num_whole_sent))
-    print("Mean Probabilities: {}".format(sum(probabilities.values())/n))
-    print("Token acc: {}".format(token_acc))
+    print("Whole sent acc: {}".format(round(whole_sent_acc/num_whole_sent, 3)))
+    print("Mean Probabilities: {}".format(round( sum(probabilities.values())/n, 3)) )
+    print("Token acc: {}".format(round( token_acc, 3)))
     # print("Unk token acc: {}".format(unk_token_acc))
     
     confusion_matrix(pos_tagger.tag2idx, pos_tagger.idx2tag, predictions.values(), tags, 'cm.png')
@@ -197,7 +205,7 @@ class POSTagger():
     def sequence_probability(self, sequence, tags):
         """Computes the probability of a tagged sequence given the emission/transition probabilities.
         """
-        self.sequence = sequence    # np.array(["I", "am", "happy"])
+        self.sequence = sequence    
         
         ## TODO
         return 0. 
@@ -211,20 +219,10 @@ class POSTagger():
             - decoding with beam search
             - viterbi
         """
-        # 0 for viterbi, 1 for greedy
-        flag = 1
-        
-        ret = []
-        if flag == 0:
-            idxseq = []
-            for word in sequence:
-                idxseq.append(self.word2idx[word])
-            x = viterbi(idxseq, self.trigrams, self.lexical, self.tag2idx,self.idx2word)
-            for tag in x:
-                ret.append(self.idx2tag[tag])
-            return ret
+        # GREEDY = 0 BEAM = 1; BEAM_K = 2 VITERBI = 2
+        flag = VITERBI
         # GREEDY
-        if flag == 1:
+        if flag == GREEDY:
             idxseq = []
             for word in sequence:
                 idxseq.append(self.word2idx[word])
@@ -239,6 +237,18 @@ class POSTagger():
                 pred_tags.append(self.idx2tag[i])
             # Return predicted tags
             return pred_tags
+        # VITERBI
+        ret = []
+        if flag == VITERBI:
+            idxseq = []
+            for word in sequence:
+                idxseq.append(self.word2idx[word])
+            #x = viterbi3(idxseq, self.trigrams, self.lexical, self.tag2idx, self.idx2word, self.idx2tag)
+            x = viterbi2(idxseq, self.bigrams, self.lexical, self.tag2idx)
+
+            for tag in x:
+                ret.append(self.idx2tag[tag])
+            return ret
 
 
 
@@ -255,16 +265,11 @@ if __name__ == "__main__":
     # Printing/Testing ----------------------------------------------
     pos_tagger.get_emissions(); pos_tagger.get_bigrams(); 
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
-    # print(pos_tagger.trigrams[0,3,:])
-    #print(pos_tagger.tag2idx.keys()) 
-    # print(pos_tagger.word2idx["<STOP>"])
-    # print(pos_tagger.inference(train_data[0]))
-    print(pos_tagger.inference(["the","house","."]))
     
-    print(
-        linear_interpolation( pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams )
-    )
-
+    # print(pos_tagger.inference(["-docstart-","the","house",".","<STOP>"]))
+    # print(pos_tagger.inference(["-docstart-","Fed","raised","interest",".","<STOP>"]))
+    # print( linear_interpolation( pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams ) )
+    print(pos_tagger.lexical )
     # from sklearn.metrics import precision_recall_fscore_support as score
     # predicted = [pos_tagger.inference( train_data[0][i]) for i in range(len(train_data[0])) ]
     # actual = train_data[1]
@@ -277,23 +282,17 @@ if __name__ == "__main__":
     # print("And the average fscore is ", round( statistics.mean(fscore), 3))
 
 
-    print(
-        pos_tagger.inference(["-docstart-","Fed","raised","interest","<STOP>"])
-        )
+    # print(pos_tagger.idx2tag)
+    # #print(np.argmax(pos_tagger.trigrams[pos_tagger.tag2idx["DT"], pos_tagger.tag2idx["NN"],pos_tagger.tag2idx["NN"]] * pos_tagger.lexical[:,pos_tagger.word2idx["Quality"]]))
+    # print(np.argmax(pos_tagger.lexical[:,pos_tagger.word2idx["anymore"]]))
     
-
-    # evaluate(
-    #     train_data,
-    #     pos_tagger
-    # )
-    # beam_search_decoder(['good', 'morning'], 1)
-
-    # print(test_data)
-
     # evaluate( 
-    #     test_data,
+    #     [train_data[0][0:4], train_data[1][0:4]],
     #     pos_tagger
     #  )
+
+    # print(subcategorize(['word', 'wgasgfaerf', 'sdgging']))
+
     #  End of Testing -----------------------------------------------   
 
     # Experiment with your decoder using greedy decoding, beam search, viterbi...
