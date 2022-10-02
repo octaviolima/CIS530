@@ -239,7 +239,8 @@ class POSTagger():
             - viterbi
         """
         # GREEDY = 0 BEAM = 1; BEAM_K = 2 VITERBI2 = 3, viterbi3 = 4
-        flag = 3
+        flag = GREEDY
+
         # GREEDY
         if flag == GREEDY:
             idxseq = []
@@ -256,15 +257,17 @@ class POSTagger():
                 pred_tags.append(self.idx2tag[i])
             # Return predicted tags
             return pred_tags
+
         # VITERBI
         ret = []
         if flag == 3 or flag == 4:
             idxseq = []
             for word in sequence:
                 idxseq.append(self.word2idx[word])
+            # Bigram Viterbi
             if flag == 3:
-            
                 x = viterbi2(idxseq, self.bigrams, self.lexical, self.tag2idx)
+            # Trigram Viterbi
             elif flag == 4:
                 x = viterbi3(idxseq, self.trigrams, self.lexical, self.tag2idx, self.idx2word, self.idx2tag)
 
@@ -289,9 +292,8 @@ if __name__ == "__main__":
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
     
     # print(pos_tagger.inference(["-docstart-","the","house",".","<STOP>"]))
-    print(pos_tagger.inference(["-docstart-","Fed","raised","interest",".","<STOP>"]))
+    # print(pos_tagger.inference(["-docstart-","Fed","raised","interest",".","<STOP>"]))
     # print( linear_interpolation( pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams ) )
-    
     # from sklearn.metrics import precision_recall_fscore_support as score
     # predicted = [pos_tagger.inference( train_data[0][i]) for i in range(len(train_data[0])) ]
     # actual = train_data[1]

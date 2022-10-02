@@ -289,31 +289,34 @@ def linear_interpolation(unigram_c, bigram_c, trigram_c):
     norm_w = [float(a)/sum(weights) for a in weights]
     return [norm_w, weights]
 
-
-
-def subcategorize(sequence, all_words):
-    # Loop thru each word in sentence
-    idxseq = []
-    for word in sequence:
-      # if word doesnt exist in train dataset, give it a *_like tag
-      if (word in all_words) == False:
-            # if word is a digit
-            if re.search(r'\d', word):
-                print( 'CD' )
-            # if word has ending that looks like noun
-            elif re.search(r'(ion\b|ty\b|ics\b|ment\b|ence\b|ance\b|ness\b|ist\b|ism\b)', word):
-                print( 'NN' )
-            # if word looks like a verb in its past form
-            # elif re.search(r'(ate\b|fy\b|ize\b|\ben|\bem|ing\b)', word):
-                # print( '' )
-            # if word looks like a verb in the gerund form
-                # print( '' )
-            # if word's ending looks like an adjective
-            elif re.search(r'(\bun|\bin|ble\b|ry\b|ish\b|ious\b|ical\b|\bnon)', word):
-                print( '_ADJLIKE_' )
-            # if none of the above
-            else:
-                print( '_RARE_' )
+              
+def unknown_words( self, word ):
+    # Create empty matrix of shape (all_tags, :)
+    empty_matrix = np.zeros( len(self.all_tags),  ) 
+    # If word is a digit, then assign 1 probability of it being `CD`
+    if re.search(r'\d', word):
+        empty_matrix[ self.tag2idx['CD'], ] = 1
+    # if word has ending that looks like noun
+    elif re.search(r'(ion\b|ty\b|ics\b|ment\b|ence\b|ance\b|ness\b|ist\b|ism\b)', word):
+        empty_matrix[ self.tag2idx['NN'],   ] = 0.25
+        empty_matrix[ self.tag2idx['NNS'],  ] = 0.25
+        empty_matrix[ self.tag2idx['NNP'],  ] = 0.25
+        empty_matrix[ self.tag2idx['NNPS'], ] = 0.25
+    # If looks like gerund verb
+    elif re.search(r'(ing\b)', word):
+        empty_matrix[ self.tag2idx['VBG'], ] = 1
+    # if word looks like a verb
+    elif re.search(r'(ate\b|fy\b|ize\b|\ben|\bem)', word):
+        empty_matrix[ self.tag2idx['VB'],  ] = 0.36
+        empty_matrix[ self.tag2idx['VBD'], ] = 0.36
+        empty_matrix[ self.tag2idx['VBN'], ] = 0.1
+        empty_matrix[ self.tag2idx['VBP'], ] = 0.12
+        empty_matrix[ self.tag2idx['VBZ'], ] = 0.06
+    # if word's ending looks like an adjective
+    elif re.search(r'(\bun|\bin|ble\b|ry\b|ish\b|ious\b|ical\b|\bnon)', word):
+        empty_matrix[ self.tag2idx['JJ'], ] = 1
+    return empty_matrix
+        
 
 
 
