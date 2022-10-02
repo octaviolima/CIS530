@@ -202,7 +202,7 @@ class POSTagger():
             - smoothing.
             - N-gram models with varying N.
         """
-        self.data = self.preprocessing(data)
+        self.data = data
         self.all_tags = list(set([t for tag in data[1] for t in tag]))
         self.tag2idx = {self.all_tags[i]:i for i in range(len(self.all_tags))}
         self.idx2tag = {v:k for k,v in self.tag2idx.items()}
@@ -232,14 +232,12 @@ class POSTagger():
         """
         # 0 for viterbi, non-0 for greedy
         flag = 0
-        sequence = list(filter(self.is_punctuation, sequence))
-        print(sequence)
         ret = []
         if flag == 0:
             idxseq = []
             for word in sequence:
                 idxseq.append(self.word2idx[word])
-            x = viterbi(idxseq, self.trigrams, self.lexical, self.tag2idx,self.idx2word)
+            x = viterbi(idxseq, self.trigrams, self.lexical, self.tag2idx,self.idx2tag,self.idx2word )
             for tag in x:
                 ret.append(self.idx2tag[tag])
             return ret
@@ -296,18 +294,18 @@ if __name__ == "__main__":
     train_data = load_data("data/train_x.csv", "data/train_y.csv")
     #dev_data = load_data("data/dev_x.csv", "data/dev_y.csv")
     # test_data = load_data("data/test_x.csv")
-    pos_tagger.preprocessing(train_data)
 
     pos_tagger.train(train_data)
 
     # Printing/Testing ----------------------------------------------
     pos_tagger.get_emissions(); pos_tagger.get_bigrams(); 
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
+    #print(pos_tagger.trigrams[pos_tagger.tag2idx["IN"], pos_tagger.tag2idx["NN"],:])
     # print(pos_tagger.trigrams[0,3,:])
     #print(pos_tagger.tag2idx.keys()) 
-    print(pos_tagger.inference(["-docstart-","Fed","raised","interest","on","housing","<STOP>"]))
-    
-    
+    print(pos_tagger.inference(["-docstart-","Fed","raised","interest","on","housing",".","<STOP>"]))
+    #print(pos_tagger.inference(["-docstart-","Fed","raised","interest",".","<STOP>"]))
+
     # print(pos_tagger.lexical)
 
     # pos_tagger.greedy_decoder()
