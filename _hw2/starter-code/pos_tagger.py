@@ -23,7 +23,7 @@ def evaluate(data, model):
     As per the write-up, you may find it faster to use multiprocessing (code included). 
     
     """
-    processes = 4
+    processes = 1
     sentences = data[0]
     tags = data[1]
     n = len(sentences)
@@ -31,29 +31,37 @@ def evaluate(data, model):
     n_tokens = sum([len(d) for d in sentences])
     # unk_n_tokens = sum([1 for s in sentences for w in s if w not in model.word2idx.keys()])
     predictions = {i:None for i in range(n)}
-    probabilities = {i:None for i in range(n)}
+    probabilities = {i:0 for i in range(n)}
          
     start = time.time()
-    pool = Pool(processes=processes)
-    res = []
-    for i in range(0, n, k):
-        res.append(pool.apply_async(infer_sentences, [model, sentences[i:i+k], i]))
-    ans = [r.get(timeout=None) for r in res]
-    predictions = dict()
-    for a in ans:
-        predictions.update(a)
-    print(f"Inference Runtime: {(time.time()-start)/60} minutes.")
+    ans = []
+    for i in range(0,n):
+        predictions[i] = model.inference(sentences[i])
+    # start = time.time()
+    # pool = Pool(processes=processes)
+    # res = []
+    # for i in range(0, n, k):
+    #     res.append(pool.apply_async(infer_sentences, [model, sentences[i:i+k], i]))
+    # ans = [r.get(timeout=None) for r in res]
     
-    start = time.time()
-    pool = Pool(processes=processes)
-    res = []
-    for i in range(0, n, k):
-        res.append(pool.apply_async(compute_prob, [model, sentences[i:i+k], tags[i:i+k], i]))
-    ans = [r.get(timeout=None) for r in res]
-    probabilities = dict()
-    for a in ans:
-        probabilities.update(a)
-    print(f"Probability Estimation Runtime: {(time.time()-start)/60} minutes.")
+    # predictions = dict()
+    
+    # for a in ans:
+    #     predictions.update(a)
+    
+    print(f"Inference Runtime: {round((time.time()-start)/60, 3)} minutes.")
+    
+    # start = time.time()
+    # pool = Pool(processes=processes)
+    # res = []
+    # for i in range(0, n, k):
+    #     print(i)
+    #     res.append(pool.apply_async(compute_prob, [model, sentences[i:i+k], tags[i:i+k], i]))
+    # ans = [r.get(timeout=None) for r in res]
+    # probabilities = dict()
+    # for a in ans:
+    #     probabilities.update(a)
+    # print(f"Probability Estimation Runtime: {round( (time.time()-start)/60, 3)} minutes.")
 
 
     token_acc = sum([1 for i in range(n) for j in range(len(sentences[i])) if tags[i][j] == predictions[i][j]]) / n_tokens
@@ -70,9 +78,9 @@ def evaluate(data, model):
             num_whole_sent += 1
             start_idx = end_idx+1
             end_idx = eos_idxes[i]
-    print("Whole sent acc: {}".format(whole_sent_acc/num_whole_sent))
-    print("Mean Probabilities: {}".format(sum(probabilities.values())/n))
-    print("Token acc: {}".format(token_acc))
+    print("Whole sent acc: {}".format(round(whole_sent_acc/num_whole_sent, 3)))
+    print("Mean Probabilities: {}".format(round( sum(probabilities.values())/n, 3)) )
+    print("Token acc: {}".format(round( token_acc, 3)))
     # print("Unk token acc: {}".format(unk_token_acc))
     
     confusion_matrix(pos_tagger.tag2idx, pos_tagger.idx2tag, predictions.values(), tags, 'cm.png')
@@ -102,7 +110,7 @@ class POSTagger():
                 idx_second = self.tag2idx[pos_second]
                 self.unigrams[idx_first,idx_second] += 1
         # Do we need to normalize this by dividing each instance by sum of all cases?????
-        # self.unigrams = self.unigrams / self.unigrams.sum(axis = 1).sum(axis = 0)
+        self.unigrams = self.unigrams / self.unigrams.sum(axis = 1).sum(axis = 0)
 
         # office hours: take log of probabilities
         pass
@@ -215,7 +223,7 @@ class POSTagger():
     def sequence_probability(self, sequence, tags):
         """Computes the probability of a tagged sequence given the emission/transition probabilities.
         """
-        self.sequence = sequence    # np.array(["I", "am", "happy"])
+        self.sequence = sequence    
         
         ## TODO
         return 0. 
@@ -230,60 +238,36 @@ class POSTagger():
             - decoding with beam search
             - viterbi
         """
-        # 0 for viterbi, non-0 for greedy
-        flag = 0
-        ret = []
-        if flag == 0:
+        # GREEDY = 0 BEAM = 1; BEAM_K = 2 VITERBI = 2
+        flag = VITERBI
+        # GREEDY
+        if flag == GREEDY:
             idxseq = []
             for word in sequence:
                 idxseq.append(self.word2idx[word])
-            x = viterbi(idxseq, self.trigrams, self.lexical, self.tag2idx,self.idx2tag,self.idx2word )
+            data = self.lexical[:,idxseq]
+            # loop through columns to get index of highest value
+            pred_index = []
+            for i in range( data.shape[1] ):
+                pred_index.append( data[:,i].argmax() )
+            # Now that we have index of predicted tag, we get that tag
+            pred_tags = []
+            for i in pred_index:
+                pred_tags.append(self.idx2tag[i])
+            # Return predicted tags
+            return pred_tags
+        # VITERBI
+        ret = []
+        if flag == VITERBI:
+            idxseq = []
+            for word in sequence:
+                idxseq.append(self.word2idx[word])
+            #x = viterbi3(idxseq, self.trigrams, self.lexical, self.tag2idx, self.idx2word, self.idx2tag)
+            x = viterbi2(idxseq, self.bigrams, self.lexical, self.tag2idx)
+
             for tag in x:
                 ret.append(self.idx2tag[tag])
             return ret
-        # GREEDY
-        if flag != 0:
-            idxseq = []
-            for word in data:
-                idxseq.append(self.word2idx[word])
-                data = self.lexical[:,idxseq]
-                # loop through columns to get index of highest value
-                pred_index = []
-                for i in range( data.shape[1] ):
-                    pred_index.append( data[:,i].argmax() )
-                # Now that we have index of predicted tag, we get that tag
-                pred_tags = []
-                for i in pred_index:
-                    pred_tags.append(self.idx2tag[i])
-                # Return predicted tags
-                return pred_tags
-
-    # def viterbi(self, sequence):
-    #     idxseq = []
-    #     for word in sequence:
-    #         idxseq.append(self.word2idx[word])
-    #     x, T1, T2 = viterbi(idxseq, self.trigrams, self.lexical, self.tag2idx)
-    #     ret = []
-    #     for tag in x:
-    #         ret.append(self.idx2tag[tag])
-    #     return ret
-
-    # def greedy_decoder(self, data):
-    #     # Get columns in emission matrix that correspond to word(s)
-    #     idxseq = []
-    #     for word in data:
-    #         idxseq.append(self.word2idx[word])
-    #     data = self.lexical[:,idxseq]
-    #     # loop through columns to get index of highest value
-    #     pred_index = []
-    #     for i in range( data.shape[1] ):
-    #         pred_index.append( data[:,i].argmax() )
-    #     # Now that we have index of predicted tag, we get that tag
-    #     pred_tags = []
-    #     for i in pred_index:
-    #         pred_tags.append(self.idx2tag[i])
-    #     # Return predicted tags
-    #     return pred_tags
 
 
 
@@ -300,33 +284,34 @@ if __name__ == "__main__":
     # Printing/Testing ----------------------------------------------
     pos_tagger.get_emissions(); pos_tagger.get_bigrams(); 
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
-    #print(pos_tagger.trigrams[pos_tagger.tag2idx["IN"], pos_tagger.tag2idx["NN"],:])
-    # print(pos_tagger.trigrams[0,3,:])
-    #print(pos_tagger.tag2idx.keys()) 
-    print(pos_tagger.inference(["-docstart-","Fed","raised","interest","on","housing",".","<STOP>"]))
-    #print(pos_tagger.inference(["-docstart-","Fed","raised","interest",".","<STOP>"]))
+    
+    # print(pos_tagger.inference(["-docstart-","the","house",".","<STOP>"]))
+    # print(pos_tagger.inference(["-docstart-","Fed","raised","interest",".","<STOP>"]))
+    # print( linear_interpolation( pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams ) )
+    print(pos_tagger.lexical )
+    # from sklearn.metrics import precision_recall_fscore_support as score
+    # predicted = [pos_tagger.inference( train_data[0][i]) for i in range(len(train_data[0])) ]
+    # actual = train_data[1]
+    # predicted = [item for sublist in predicted for item in sublist]
+    # actual = [item for sublist in actual for item in sublist]
+    # precision, recall, fscore, support = score(actual, predicted)
+    # import statistics
+    # print("The average Precision across all individual tags is", round( statistics.mean(precision), 3) )
+    # print("The average Recall is ", round( statistics.mean(recall), 3))
+    # print("And the average fscore is ", round( statistics.mean(fscore), 3))
 
-    # print(pos_tagger.lexical)
 
-    # pos_tagger.greedy_decoder()
-
-    # print(
-    #     pos_tagger.inference(["-docstart-","Fed","raised","interest","<STOP>"])
-    #     )
-    # )
-
-    # evaluate(
-    #     train_data,
-    #     pos_tagger
-    # )
-    # beam_search_decoder(['good', 'morning'], 1)
-
-    # print(test_data)
-
+    # print(pos_tagger.idx2tag)
+    # #print(np.argmax(pos_tagger.trigrams[pos_tagger.tag2idx["DT"], pos_tagger.tag2idx["NN"],pos_tagger.tag2idx["NN"]] * pos_tagger.lexical[:,pos_tagger.word2idx["Quality"]]))
+    # print(np.argmax(pos_tagger.lexical[:,pos_tagger.word2idx["anymore"]]))
+    
     # evaluate( 
-    #     test_data,
+    #     [train_data[0][0:4], train_data[1][0:4]],
     #     pos_tagger
     #  )
+
+    # print(subcategorize(['word', 'wgasgfaerf', 'sdgging']))
+
     #  End of Testing -----------------------------------------------   
 
     # Experiment with your decoder using greedy decoding, beam search, viterbi...
@@ -350,25 +335,3 @@ if __name__ == "__main__":
 
 
 
-    ###### OBSOLETE #######
-    # beam search
-    # def beam_search_decoder(data, k, self):
-    #     idxseq = []
-    #     for word in data:
-    #         idxseq.append(self.word2idx[word])
-    #     data = self.lexical[:,idxseq]
-    #     sequences = [[list(), 0.0]]
-    #     # walk over each step in sequence
-    #     for row in data:
-    #         all_candidates = list()
-    #         # expand each current candidate
-    #         for i in range(len(sequences)):
-    #             seq, score = sequences[i]
-    #             for j in range(len(row)):
-    #                 candidate = [seq + [j], score - log(row[j])]
-    #                 all_candidates.append(candidate)
-    #         # order all candidates by score
-    #         ordered = sorted(all_candidates, key=lambda tup:tup[1])
-    #         # select k best
-    #         sequences = ordered[:k]
-    #     return sequences
