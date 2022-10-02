@@ -23,7 +23,7 @@ def evaluate(data, model):
     As per the write-up, you may find it faster to use multiprocessing (code included). 
     
     """
-    processes = 1
+    processes = 10
     sentences = data[0]
     tags = data[1]
     n = len(sentences)
@@ -37,31 +37,31 @@ def evaluate(data, model):
     ans = []
     for i in range(0,n):
         predictions[i] = model.inference(sentences[i])
-    # start = time.time()
-    # pool = Pool(processes=processes)
-    # res = []
-    # for i in range(0, n, k):
-    #     res.append(pool.apply_async(infer_sentences, [model, sentences[i:i+k], i]))
-    # ans = [r.get(timeout=None) for r in res]
+    start = time.time()
+    pool = Pool(processes=processes)
+    res = []
+    for i in range(0, n, k):
+        res.append(pool.apply_async(infer_sentences, [model, sentences[i:i+k], i]))
+    ans = [r.get(timeout=None) for r in res]
     
-    # predictions = dict()
+    predictions = dict()
     
-    # for a in ans:
-    #     predictions.update(a)
+    for a in ans:
+        predictions.update(a)
     
     print(f"Inference Runtime: {round((time.time()-start)/60, 3)} minutes.")
     
-    # start = time.time()
-    # pool = Pool(processes=processes)
-    # res = []
-    # for i in range(0, n, k):
-    #     print(i)
-    #     res.append(pool.apply_async(compute_prob, [model, sentences[i:i+k], tags[i:i+k], i]))
-    # ans = [r.get(timeout=None) for r in res]
-    # probabilities = dict()
-    # for a in ans:
-    #     probabilities.update(a)
-    # print(f"Probability Estimation Runtime: {round( (time.time()-start)/60, 3)} minutes.")
+    start = time.time()
+    pool = Pool(processes=processes)
+    res = []
+    for i in range(0, n, k):
+        # print(i)
+        res.append(pool.apply_async(compute_prob, [model, sentences[i:i+k], tags[i:i+k], i]))
+    ans = [r.get(timeout=None) for r in res]
+    probabilities = dict()
+    for a in ans:
+        probabilities.update(a)
+    print(f"Probability Estimation Runtime: {round( (time.time()-start)/60, 3)} minutes.")
 
 
     token_acc = sum([1 for i in range(n) for j in range(len(sentences[i])) if tags[i][j] == predictions[i][j]]) / n_tokens
@@ -228,8 +228,10 @@ class POSTagger():
         ## TODO
         return 0. 
         pass
+
     def is_punctuation(self,word):
         return not word in string.punctuation
+
     def inference(self, sequence):
         """Tags a sequence with part of speech tags.
         You should implement different kinds of inference (suggested as separate
@@ -238,15 +240,21 @@ class POSTagger():
             - decoding with beam search
             - viterbi
         """
-        # GREEDY = 0 BEAM = 1; BEAM_K = 2 VITERBI2 = 3, viterbi3 = 4
-        flag = GREEDY
+        # GREEDY = 0; BEAM_1 = 1; BEAM_2 = 2; BEAM_3 = 3; VITERBI2 = 4; VITERBI3 = 5
+        flag = BEAM_2
 
         # GREEDY
         if flag == GREEDY:
             idxseq = []
+            unknown = []
             for word in sequence:
-                idxseq.append(self.word2idx[word])
-            data = self.lexical[:,idxseq]
+                if (word in self.all_words) == True:
+                    idxseq.append(self.lexical[:,self.word2idx[word]])
+                    # data = np.array(idxseq).T
+                else:
+                    idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
+                    # data = np.array(idxseq).T
+            data = np.array(idxseq).T
             # loop through columns to get index of highest value
             pred_index = []
             for i in range( data.shape[1] ):
@@ -257,6 +265,90 @@ class POSTagger():
                 pred_tags.append(self.idx2tag[i])
             # Return predicted tags
             return pred_tags
+
+        # Beam Search
+        if flag == BEAM_1:
+                i = []
+                for word in sequence:
+                    i.append( self.word2idx[ word ] )
+                data = self.lexical[:,i]
+                data = np.array(data).T
+                # print( data.T )
+                sequences = [[list(), 0.0]]
+                # walk over each step in sequence
+                for row in data:
+                    all_candidates = list()
+                    # expand each current candidate
+                    for i in range(len(sequences)):
+                        seq, score = sequences[i]
+                        for j in range(len(row)):
+                            candidate = [seq + [j], score - log(row[j])]
+                            all_candidates.append(candidate)
+                        # order all candidates by score
+                        ordered = sorted(all_candidates, key=lambda tup:tup[1])
+                            # select k best
+                        sequences = ordered[:1]
+                        pred_tags = []
+                        for i in sequences[0][0]:
+                            pred_tags.append(self.idx2tag[i])
+                # return( [ sequences[0][0], sequences[1][0], sequences[2][0] ] )
+                return( pred_tags )
+            
+        # Beam Search 2
+        if flag == BEAM_2:
+                i = []
+                for word in sequence:
+                    i.append( self.word2idx[ word ] )
+                data = self.lexical[:,i]
+                data = np.array(data).T
+                # print( data.T )
+                sequences = [[list(), 0.0]]
+                # walk over each step in sequence
+                for row in data:
+                    all_candidates = list()
+                    # expand each current candidate
+                    for i in range(len(sequences)):
+                        seq, score = sequences[i]
+                        for j in range(len(row)):
+                            candidate = [seq + [j], score - log(row[j])]
+                            all_candidates.append(candidate)
+                        # order all candidates by score
+                        ordered = sorted(all_candidates, key=lambda tup:tup[1])
+                            # select k best
+                        sequences = ordered[:2]
+                        pred_tags = []
+                        for i in sequences[1][0]:
+                            pred_tags.append(self.idx2tag[i])
+                # return( [ sequences[0][0], sequences[1][0], sequences[2][0] ] )
+                return( pred_tags )
+
+        # Beam Search 2
+        if flag == BEAM_3:
+                i = []
+                for word in sequence:
+                    i.append( self.word2idx[ word ] )
+                data = self.lexical[:,i]
+                data = np.array(data).T
+                # print( data.T )
+                sequences = [[list(), 0.0]]
+                # walk over each step in sequence
+                for row in data:
+                    all_candidates = list()
+                    # expand each current candidate
+                    for i in range(len(sequences)):
+                        seq, score = sequences[i]
+                        for j in range(len(row)):
+                            candidate = [seq + [j], score - log(row[j])]
+                            all_candidates.append(candidate)
+                        # order all candidates by score
+                        ordered = sorted(all_candidates, key=lambda tup:tup[1])
+                            # select k best
+                        sequences = ordered[:3]
+                        pred_tags = []
+                        for i in sequences[1][0]:
+                            pred_tags.append(self.idx2tag[i])
+                # return( [ sequences[0][0], sequences[1][0], sequences[2][0] ] )
+                return( pred_tags )
 
         # VITERBI
         ret = []
@@ -281,8 +373,10 @@ if __name__ == "__main__":
 
     pos_tagger = POSTagger()
 
+
+
     train_data = load_data("data/train_x.csv", "data/train_y.csv")
-    #dev_data = load_data("data/dev_x.csv", "data/dev_y.csv")
+    dev_data = load_data("data/dev_x.csv", "data/dev_y.csv")
     # test_data = load_data("data/test_x.csv")
 
     pos_tagger.train(train_data)
@@ -291,31 +385,27 @@ if __name__ == "__main__":
     pos_tagger.get_emissions(); pos_tagger.get_bigrams(); 
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
     
-    # print(pos_tagger.inference(["-docstart-","the","house",".","<STOP>"]))
-    # print(pos_tagger.inference(["-docstart-","Fed","raised","interest",".","<STOP>"]))
-    # print( linear_interpolation( pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams ) )
-    # from sklearn.metrics import precision_recall_fscore_support as score
-    # predicted = [pos_tagger.inference( train_data[0][i]) for i in range(len(train_data[0])) ]
-    # actual = train_data[1]
-    # predicted = [item for sublist in predicted for item in sublist]
-    # actual = [item for sublist in actual for item in sublist]
-    # precision, recall, fscore, support = score(actual, predicted)
-    # import statistics
-    # print("The average Precision across all individual tags is", round( statistics.mean(precision), 3) )
-    # print("The average Recall is ", round( statistics.mean(recall), 3))
-    # print("And the average fscore is ", round( statistics.mean(fscore), 3))
+    # print(pos_tagger.inference(["-docstart-","house",".","<STOP>"]))
 
 
-    # print(pos_tagger.idx2tag)
-    # #print(np.argmax(pos_tagger.trigrams[pos_tagger.tag2idx["DT"], pos_tagger.tag2idx["NN"],pos_tagger.tag2idx["NN"]] * pos_tagger.lexical[:,pos_tagger.word2idx["Quality"]]))
-    # print(np.argmax(pos_tagger.lexical[:,pos_tagger.word2idx["anymore"]]))
-    
-    # evaluate( 
-    #     [train_data[0][0:4], train_data[1][0:4]],
-    #     pos_tagger
-    #  )
+    from sklearn.metrics import precision_recall_fscore_support as score
+    predicted = [pos_tagger.inference( train_data[0][i]) for i in range(len(train_data[0])) ]
+    actual = train_data[1]
+    predicted = [item for sublist in predicted for item in sublist]
+    actual = [item for sublist in actual for item in sublist]
+    precision, recall, fscore, support = score(actual, predicted)
+    import statistics
+    print("The average Precision across all individual tags is", round( statistics.mean(precision), 3) )
+    print("The average Recall is ", round( statistics.mean(recall), 3))
+    print("And the average fscore is ", round( statistics.mean(fscore), 3))
 
-    # print(subcategorize(['word', 'wgasgfaerf', 'sdgging']))
+    print("Beam 1 Results on Train")
+    evaluate( 
+        train_data,
+        # train_data,
+        pos_tagger
+     )
+
 
     #  End of Testing -----------------------------------------------   
 

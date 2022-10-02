@@ -8,9 +8,9 @@ EPSILON = 1e-100
 
 ### Inference Types ###
 GREEDY = 0
-BEAM = 1; BEAM_K = 2
-VITERBI = 2
-INFERENCE = VITERBI 
+BEAM_1 = 1; BEAM_2 = 2; BEAM_3 = 3
+VITERBI2 = 4; VITERBI3 = 5
+INFERENCE = VITERBI2 
 
 ### Smoothing Types ###
 LAPLACE = 0; LAPLACE_FACTOR = .2

@@ -158,23 +158,23 @@ def viterbi2(y, A, B,tag2idx):
     T2: array (K, T)
         the x_j-1 of the most likely path so far
     """
-    # Turn (47,47) diagonal array into (47,)
-    # y = y.sum(axis = 1, keepdims=True).squeeze()
     # Cardinality of the state space
     num_tags = A.shape[0]
+    A = np.log(A)
+    B = np.log(B)
     # Initialize the priors with default (uniform dist) if not given by caller
     N = len(y)
     v = np.zeros((num_tags, N))
     bp = np.zeros((num_tags, N))
     # Initilaize the tracking tables from first observation
-    v[tag2idx["O"],0] = 1
+    v[:,0] = B[:,y[0]]
     # Iterate throught the observations updating the tracking tables
     for i in range(1, N):
         emissions = B[np.newaxis,:,y[i]]
         prev = v[:,i-1]
         transition = A
-        v[:, i] = np.max(prev * transition.T * emissions.T, 1)
-        bp[:, i] = np.argmax(prev * transition.T, 1)
+        v[:, i] = np.max(prev + transition.T + emissions.T, 1)
+        bp[:, i] = np.argmax(prev + transition.T, 1)
 
     # Build the output, optimal model trajectory
     x = np.zeros(N)
@@ -182,14 +182,8 @@ def viterbi2(y, A, B,tag2idx):
     for i in reversed(range(1, N)):
         x[i - 1] = bp[int(x[i]), i]
     return x
-
-def get_index(tag1, tag2, tag2idx):
-    idx1 = tag2idx[tag1]
-    idx2 = tag2idx[tag2]
-    n = len(tag2idx.keys()) 
-    return idx1*n + idx2
     
-def viterbi3(y, A, B, tag2idx, idx2word, idx2tag):
+def viterbi3(y, T, E, tag2idx, idx2word, idx2tag):
     # y : array (T,)
     #     Observation state sequence. int dtype.
     # A : array (K, K, K )
@@ -200,15 +194,17 @@ def viterbi3(y, A, B, tag2idx, idx2word, idx2tag):
     # Pi: optional, (K,)
     #     Initial state probabilities: Pi[i] is the probability x[0] == i. If
     #     None, uniform initial distribution is assumed (Pi[:] == 1/K).
-    debug = 1
-    possible_states = A.shape[0]
-    N = A.shape[0]
+    debug = 0
+    log_transition = np.log(T)
+    log_emission = np.log(E)
+    possible_states = T.shape[0]
+    N = T.shape[0]
     length_of_sentence = len(y)
     v = np.zeros((possible_states,possible_states,length_of_sentence))
+    v += float('-inf')
     bp = np.zeros((possible_states,possible_states, length_of_sentence))
     v[tag2idx["O"],tag2idx["O"],0] = 1
     has_values = [(tag2idx["O"],tag2idx["O"])]
-    print(A[tag2idx["IN"],tag2idx["NN"],:])
     if debug:
         print(tag2idx)
     for i in range(1, length_of_sentence):
@@ -216,34 +212,21 @@ def viterbi3(y, A, B, tag2idx, idx2word, idx2tag):
         possible = set()
         for value1,value2 in has_values:
 
-            # emissions = B[:,y[i]]
-            # transition = np.copy(A[:,value2,:])
-            # # # getting all memorized values in the form x,value2
-            # prev = v[:,value2, i-1] 
-            # for n,x in enumerate(prev):
-            #     transition[n] = transition[n]* x
-            
-            # v[value2,:,i] = emissions * np.max(transition,0)
-            # bp[:,value2,i] = value1
-            # mean = np.mean(emissions * np.max(transition,0))
-            # for prob_i,prob in enumerate(emissions * np.max(transition,0)):
-            #     if prob/mean > 1:
-            #         new_has_values.add((value2,prob_i))
-            #         possible.add(prob_i)
-            emissions = B[np.newaxis,:,y[i]]
-            transition = A[:,value2,:]
+            emissions = log_emission[np.newaxis,:,y[i]]
+            transition = log_transition[:,value2,:]
             prev = v[:,value2, i-1] 
-            v[value2,:,i] = np.max(prev * transition.T * emissions.T, 1)
-            bp[value2,:,i] = np.argmax(prev * transition.T, 1)
+            v[value2,:,i] = np.max(prev + transition.T + emissions.T, 1)
+            #print(np.max(prev * transition.T * emissions.T, 1))
+            bp[:,value2,i] = np.argmax(prev + transition.T, 1)
             # print(np.max(prev * transition.T * emissions.T, 1))
-            mean = np.mean(prev * transition.T * emissions.T)
-            for prob_i,prob in enumerate(np.max(prev * transition.T * emissions.T,1)):
-                if prob/mean > 1:
+            for prob_i,prob in enumerate(E[:,y[i]]):
+                if prob> .1:
                     new_has_values.add((value2,prob_i))
                     possible.add(prob_i)
-        if len(has_values) == 1:
-            print( np.max(transition,0))
-        print(idx2word[i],[(idx2tag[valu[0]],idx2tag[valu[1]]) for valu in has_values], [idx2tag[valu] for valu in possible])
+        if debug:
+            print(idx2word[y[i]],[(idx2tag[valu[0]],idx2tag[valu[1]]) for valu in has_values], [idx2tag[valu] for valu in possible])
+            # if len(possible) == 0:
+            #     print(emissions)
         has_values = new_has_values
     ret = np.zeros(length_of_sentence)
     ret[-1] = tag2idx["<STOP>"]
@@ -290,37 +273,38 @@ def linear_interpolation(unigram_c, bigram_c, trigram_c):
     return [norm_w, weights]
 
               
-def unknown_words( self, word ):
+def unknown_words( tag2idx, word ):
     # Create empty matrix of shape (all_tags, :)
-    empty_matrix = np.zeros( len(self.all_tags),  ) 
+    empty_matrix = np.zeros( len( tag2idx),  ) 
     # If word is a digit, then assign 1 probability of it being `CD`
     if re.search(r'\d', word):
-        empty_matrix[ self.tag2idx['CD'], ] = 1
+        empty_matrix[ tag2idx['CD'], ] = 1
     # if word has ending that looks like noun
     elif re.search(r'(ion\b|ty\b|ics\b|ment\b|ence\b|ance\b|ness\b|ist\b|ism\b)', word):
-        empty_matrix[ self.tag2idx['NN'],   ] = 0.25
-        empty_matrix[ self.tag2idx['NNS'],  ] = 0.25
-        empty_matrix[ self.tag2idx['NNP'],  ] = 0.25
-        empty_matrix[ self.tag2idx['NNPS'], ] = 0.25
+        empty_matrix[ tag2idx['NN'],   ] = 0.25
+        empty_matrix[ tag2idx['NNS'],  ] = 0.25
+        empty_matrix[ tag2idx['NNP'],  ] = 0.25
+        empty_matrix[ tag2idx['NNPS'], ] = 0.25
     # If looks like gerund verb
     elif re.search(r'(ing\b)', word):
-        empty_matrix[ self.tag2idx['VBG'], ] = 1
+        empty_matrix[ tag2idx['VBG'], ] = 1
     # if word looks like a verb
     elif re.search(r'(ate\b|fy\b|ize\b|\ben|\bem)', word):
-        empty_matrix[ self.tag2idx['VB'],  ] = 0.36
-        empty_matrix[ self.tag2idx['VBD'], ] = 0.36
-        empty_matrix[ self.tag2idx['VBN'], ] = 0.1
-        empty_matrix[ self.tag2idx['VBP'], ] = 0.12
-        empty_matrix[ self.tag2idx['VBZ'], ] = 0.06
+        empty_matrix[ tag2idx['VB'],  ] = 0.36
+        empty_matrix[ tag2idx['VBD'], ] = 0.36
+        empty_matrix[ tag2idx['VBN'], ] = 0.1
+        empty_matrix[ tag2idx['VBP'], ] = 0.12
+        empty_matrix[ tag2idx['VBZ'], ] = 0.06
     # if word's ending looks like an adjective
     elif re.search(r'(\bun|\bin|ble\b|ry\b|ish\b|ious\b|ical\b|\bnon)', word):
-        empty_matrix[ self.tag2idx['JJ'], ] = 1
+        empty_matrix[ tag2idx['JJ'], ] = 1
+    else:
+        empty_matrix[ tag2idx['NN'],  ] = 0.4
+        empty_matrix[ tag2idx['VB'], ] = 0.3
+        empty_matrix[ tag2idx['JJ'], ] = 0.3
+
     return empty_matrix
         
-
-
-
-
 
 
 
