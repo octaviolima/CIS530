@@ -130,49 +130,26 @@ def confusion_matrix(tag2idx,idx2tag, pred, gt, fname):
     sn.heatmap(df_cm, annot=False)
     plt.savefig(fname)
 
-def viterbi2(y, A, B,tag2idx):
-    """
-    Return the MAP estimate of state trajectory of Hidden Markov Model.
+def viterbi2(y, T, E,word2idx, tag2idx):
 
-    Parameters
-    ----------
-    y : array (T,)
-        Observation state sequence. int dtype.
-    A : array (K, K)
-        State transition matrix. See HiddenMarkovModel.state_transition  for
-        details.
-    B : array (K, M)
-        Emission matrix. See HiddenMarkovModel.emission for details.
-    Pi: optional, (K,)
-        Initial state probabilities: Pi[i] is the probability x[0] == i. If
-        None, uniform initial distribution is assumed (Pi[:] == 1/K).
-
-    Returns
-    -------
-    x : array (T,)
-        Maximum a posteriori probability estimate of hidden state trajectory,
-        conditioned on observation sequence y under the model parameters A, B,
-        Pi.
-    T1: array (K, T)
-        the probability of the most likely path so far
-    T2: array (K, T)
-        the x_j-1 of the most likely path so far
-    """
     # Cardinality of the state space
-    num_tags = A.shape[0]
-    A = np.log(A)
-    B = np.log(B)
+    num_tags = T.shape[0]
+    log_transition = np.log(T)
+    log_emission = np.log(E)
     # Initialize the priors with default (uniform dist) if not given by caller
     N = len(y)
     v = np.zeros((num_tags, N))
     bp = np.zeros((num_tags, N))
     # Initilaize the tracking tables from first observation
-    v[:,0] = B[:,y[0]]
+    v[:,0] = log_emission[:,word2idx[y[0]]]
     # Iterate throught the observations updating the tracking tables
     for i in range(1, N):
-        emissions = B[np.newaxis,:,y[i]]
+        if y[i] in word2idx:
+            emissions = log_emission[np.newaxis,:,word2idx[y[i]]]
+        else:
+            emissions = np.log(unknown_words(tag2idx, y[i]))
         prev = v[:,i-1]
-        transition = A
+        transition = log_transition
         v[:, i] = np.max(prev + transition.T + emissions.T, 1)
         bp[:, i] = np.argmax(prev + transition.T, 1)
 
@@ -183,7 +160,7 @@ def viterbi2(y, A, B,tag2idx):
         x[i - 1] = bp[int(x[i]), i]
     return x
     
-def viterbi3(y, T, E, tag2idx, idx2word, idx2tag):
+def viterbi3(y, T, E, tag2idx, word2idx, idx2tag):
     # y : array (T,)
     #     Observation state sequence. int dtype.
     # A : array (K, K, K )
@@ -211,20 +188,28 @@ def viterbi3(y, T, E, tag2idx, idx2word, idx2tag):
         new_has_values = set()
         possible = set()
         for value1,value2 in has_values:
-
-            emissions = log_emission[np.newaxis,:,y[i]]
+            if y[i] not in word2idx:
+                emissions = np.log(np.array(unknown_words(tag2idx, y[i])))
+                emissions = emissions[np.newaxis,:]
+            else:
+                emissions = log_emission[np.newaxis,:,word2idx[y[i]]]
             transition = log_transition[:,value2,:]
             prev = v[:,value2, i-1] 
             v[value2,:,i] = np.max(prev + transition.T + emissions.T, 1)
-            #print(np.max(prev * transition.T * emissions.T, 1))
             bp[:,value2,i] = np.argmax(prev + transition.T, 1)
-            # print(np.max(prev * transition.T * emissions.T, 1))
-            for prob_i,prob in enumerate(E[:,y[i]]):
-                if prob> .1:
-                    new_has_values.add((value2,prob_i))
-                    possible.add(prob_i)
+
+            if y[i] in word2idx:
+                for prob_i,prob in enumerate(E[:,word2idx[y[i]]]):
+                    if prob> .1:
+                        new_has_values.add((value2,prob_i))
+                        possible.add(prob_i)
+            else:
+                for prob_i,prob in enumerate(unknown_words(tag2idx,y[i])):
+                    if prob> .1:
+                        new_has_values.add((value2,prob_i))
+                        possible.add(prob_i)
         if debug:
-            print(idx2word[y[i]],[(idx2tag[valu[0]],idx2tag[valu[1]]) for valu in has_values], [idx2tag[valu] for valu in possible])
+            print(y[i],[(idx2tag[valu[0]],idx2tag[valu[1]]) for valu in has_values], [idx2tag[valu] for valu in possible])
             # if len(possible) == 0:
             #     print(emissions)
         has_values = new_has_values

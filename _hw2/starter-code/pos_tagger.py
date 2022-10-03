@@ -34,10 +34,6 @@ def evaluate(data, model):
     probabilities = {i:0 for i in range(n)}
          
     start = time.time()
-    ans = []
-    for i in range(0,n):
-        predictions[i] = model.inference(sentences[i])
-    start = time.time()
     pool = Pool(processes=processes)
     res = []
     for i in range(0, n, k):
@@ -241,12 +237,11 @@ class POSTagger():
             - viterbi
         """
         # GREEDY = 0; BEAM_1 = 1; BEAM_2 = 2; BEAM_3 = 3; VITERBI2 = 4; VITERBI3 = 5
-        flag = VITERBI2
+        flag = BEAM_3
 
         # GREEDY
         if flag == GREEDY:
             idxseq = []
-            unknown = []
             for word in sequence:
                 if (word in self.all_words) == True:
                     idxseq.append(self.lexical[:,self.word2idx[word]])
@@ -255,6 +250,7 @@ class POSTagger():
                     idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
                     # data = np.array(idxseq).T
             data = np.array(idxseq).T
+ 
             # loop through columns to get index of highest value
             pred_index = []
             for i in range( data.shape[1] ):
@@ -268,11 +264,15 @@ class POSTagger():
 
         # Beam Search
         if flag == BEAM_1:
-                i = []
+                idxseq = []
                 for word in sequence:
-                    i.append( self.word2idx[ word ] )
-                data = self.lexical[:,i]
-                data = np.array(data).T
+                    if (word in self.all_words) == True:
+                        idxseq.append(self.lexical[:,self.word2idx[word]])
+                        # data = np.array(idxseq).T
+                    else:
+                        idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
+                        # data = np.array(idxseq).T
+                data = np.array(idxseq)
                 # print( data.T )
                 sequences = [[list(), 0.0]]
                 # walk over each step in sequence
@@ -282,7 +282,10 @@ class POSTagger():
                     for i in range(len(sequences)):
                         seq, score = sequences[i]
                         for j in range(len(row)):
-                            candidate = [seq + [j], score - log(row[j])]
+                            if row[j] == 0:
+                                candidate = [seq + [j], score + 1000]
+                            else:
+                                candidate = [seq + [j], score - log(row[j])]
                             all_candidates.append(candidate)
                         # order all candidates by score
                         ordered = sorted(all_candidates, key=lambda tup:tup[1])
@@ -296,11 +299,15 @@ class POSTagger():
             
         # Beam Search 2
         if flag == BEAM_2:
-                i = []
+                idxseq = []
                 for word in sequence:
-                    i.append( self.word2idx[ word ] )
-                data = self.lexical[:,i]
-                data = np.array(data).T
+                    if (word in self.all_words) == True:
+                        idxseq.append(self.lexical[:,self.word2idx[word]])
+                        # data = np.array(idxseq).T
+                    else:
+                        idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
+                        # data = np.array(idxseq).T
+                data = np.array(idxseq)
                 # print( data.T )
                 sequences = [[list(), 0.0]]
                 # walk over each step in sequence
@@ -310,25 +317,32 @@ class POSTagger():
                     for i in range(len(sequences)):
                         seq, score = sequences[i]
                         for j in range(len(row)):
-                            candidate = [seq + [j], score - log(row[j])]
+                            if row[j] == 0:
+                                candidate = [seq + [j], score + 1000]
+                            else:
+                                candidate = [seq + [j], score - log(row[j])]
                             all_candidates.append(candidate)
                         # order all candidates by score
                         ordered = sorted(all_candidates, key=lambda tup:tup[1])
                             # select k best
                         sequences = ordered[:2]
                         pred_tags = []
-                        for i in sequences[1][0]:
+                        for i in sequences[0][0]:
                             pred_tags.append(self.idx2tag[i])
                 # return( [ sequences[0][0], sequences[1][0], sequences[2][0] ] )
                 return( pred_tags )
 
-        # Beam Search 2
+        # Beam Search 3
         if flag == BEAM_3:
-                i = []
+                idxseq = []
                 for word in sequence:
-                    i.append( self.word2idx[ word ] )
-                data = self.lexical[:,i]
-                data = np.array(data).T
+                    if (word in self.all_words) == True:
+                        idxseq.append(self.lexical[:,self.word2idx[word]])
+                        # data = np.array(idxseq).T
+                    else:
+                        idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
+                        # data = np.array(idxseq).T
+                data = np.array(idxseq)
                 # print( data.T )
                 sequences = [[list(), 0.0]]
                 # walk over each step in sequence
@@ -338,14 +352,17 @@ class POSTagger():
                     for i in range(len(sequences)):
                         seq, score = sequences[i]
                         for j in range(len(row)):
-                            candidate = [seq + [j], score - log(row[j])]
+                            if row[j] == 0:
+                                candidate = [seq + [j], score + 1000]
+                            else:
+                                candidate = [seq + [j], score - log(row[j])]
                             all_candidates.append(candidate)
                         # order all candidates by score
                         ordered = sorted(all_candidates, key=lambda tup:tup[1])
                             # select k best
                         sequences = ordered[:3]
                         pred_tags = []
-                        for i in sequences[1][0]:
+                        for i in sequences[0][0]:
                             pred_tags.append(self.idx2tag[i])
                 # return( [ sequences[0][0], sequences[1][0], sequences[2][0] ] )
                 return( pred_tags )
@@ -355,13 +372,13 @@ class POSTagger():
         if flag == VITERBI2 or flag == VITERBI3:
             idxseq = []
             for word in sequence:
-                idxseq.append(self.word2idx[word])
+                idxseq.append(word)
             # Bigram Viterbi
             if flag == VITERBI2:
-                x = viterbi2(idxseq, self.bigrams, self.lexical, self.tag2idx)
+                x = viterbi2(idxseq, self.bigrams, self.lexical, self.word2idx,self.tag2idx)
             # Trigram Viterbi
             elif flag == VITERBI3:
-                x = viterbi3(idxseq, self.trigrams, self.lexical, self.tag2idx, self.idx2word, self.idx2tag)
+                x = viterbi3(idxseq, self.trigrams, self.lexical, self.tag2idx, self.word2idx, self.idx2tag)
 
             for tag in x:
                 ret.append(self.idx2tag[tag])
@@ -385,12 +402,12 @@ if __name__ == "__main__":
     pos_tagger.get_emissions(); pos_tagger.get_bigrams(); 
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
     
-    print(pos_tagger.inference(["-docstart-","house",".","<STOP>"]))
-
+    #print(pos_tagger.inference(dev_data[0][2]))
+    print( linear_interpolation(pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams) ) 
 
     # from sklearn.metrics import precision_recall_fscore_support as score
-    # predicted = [pos_tagger.inference( train_data[0][i]) for i in range(len(train_data[0])) ]
-    # actual = train_data[1]
+    # predicted = [pos_tagger.inference( dev_data[0][i]) for i in range(len(dev_data[0])) ]
+    # actual = dev_data[1]
     # predicted = [item for sublist in predicted for item in sublist]
     # actual = [item for sublist in actual for item in sublist]
     # precision, recall, fscore, support = score(actual, predicted)
@@ -399,12 +416,12 @@ if __name__ == "__main__":
     # print("The average Recall is ", round( statistics.mean(recall), 3))
     # print("And the average fscore is ", round( statistics.mean(fscore), 3))
 
-    print("")
-    evaluate( 
-        [train_data[0][0:10], train_data[1][0:10]],
-        # train_data,
-        pos_tagger
-     )
+    # # print("")
+    # evaluate( 
+    #     #
+    #     dev_data,
+    #     pos_tagger
+    #  )
 
 
     #  End of Testing -----------------------------------------------   
