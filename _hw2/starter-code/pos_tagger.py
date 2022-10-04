@@ -237,7 +237,7 @@ class POSTagger():
             - viterbi
         """
         # GREEDY = 0; BEAM_1 = 1; BEAM_2 = 2; BEAM_3 = 3; VITERBI2 = 4; VITERBI3 = 5
-        flag = BEAM_3
+        flag = BEAM_2
 
         # GREEDY
         if flag == GREEDY:
@@ -250,11 +250,30 @@ class POSTagger():
                     idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
                     # data = np.array(idxseq).T
             data = np.array(idxseq).T
- 
-            # loop through columns to get index of highest value
-            pred_index = []
-            for i in range( data.shape[1] ):
-                pred_index.append( data[:,i].argmax() )
+            
+            isbigram = 0
+            if isbigram:
+                # loop through columns to get index of highest value
+                pred_index = []
+                pred_index.append(self.tag2idx["O"])
+                for i in range(1, data.shape[1] ):
+                    previous_pred = pred_index[-1]
+                    # Bigram
+                    transition_array = self.bigrams[previous_pred,:]
+                    pred_index.append( (data[:,i] * transition_array).argmax() )
+            else:
+                #trigram 
+                pred_index = []
+                pred_index.append(self.tag2idx["O"])
+                pred_index.append(self.tag2idx["O"])
+                for i in range(1, data.shape[1]):
+                    previous_pred1 = pred_index[-2]
+                    previous_pred2 = pred_index[-1]
+                    transition_array = self.trigrams[previous_pred1,previous_pred2,:]
+                    pred_index.append((data[:,i] * transition_array).argmax())
+
+                pred_index.remove(self.tag2idx["O"])
+
             # Now that we have index of predicted tag, we get that tag
             pred_tags = []
             for i in pred_index:
@@ -262,110 +281,57 @@ class POSTagger():
             # Return predicted tags
             return pred_tags
 
-        # Beam Search
-        if flag == BEAM_1:
-                idxseq = []
-                for word in sequence:
-                    if (word in self.all_words) == True:
-                        idxseq.append(self.lexical[:,self.word2idx[word]])
-                        # data = np.array(idxseq).T
-                    else:
-                        idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
-                        # data = np.array(idxseq).T
-                data = np.array(idxseq)
-                # print( data.T )
-                sequences = [[list(), 0.0]]
-                # walk over each step in sequence
-                for row in data:
-                    all_candidates = list()
-                    # expand each current candidate
-                    for i in range(len(sequences)):
-                        seq, score = sequences[i]
-                        for j in range(len(row)):
-                            if row[j] == 0:
-                                candidate = [seq + [j], score + 1000]
-                            else:
-                                candidate = [seq + [j], score - log(row[j])]
-                            all_candidates.append(candidate)
-                        # order all candidates by score
-                        ordered = sorted(all_candidates, key=lambda tup:tup[1])
-                            # select k best
-                        sequences = ordered[:1]
-                        pred_tags = []
-                        for i in sequences[0][0]:
-                            pred_tags.append(self.idx2tag[i])
-                # return( [ sequences[0][0], sequences[1][0], sequences[2][0] ] )
-                return( pred_tags )
-            
-        # Beam Search 2
         if flag == BEAM_2:
-                idxseq = []
-                for word in sequence:
-                    if (word in self.all_words) == True:
-                        idxseq.append(self.lexical[:,self.word2idx[word]])
-                        # data = np.array(idxseq).T
-                    else:
-                        idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
-                        # data = np.array(idxseq).T
-                data = np.array(idxseq)
-                # print( data.T )
-                sequences = [[list(), 0.0]]
-                # walk over each step in sequence
-                for row in data:
-                    all_candidates = list()
-                    # expand each current candidate
-                    for i in range(len(sequences)):
-                        seq, score = sequences[i]
-                        for j in range(len(row)):
-                            if row[j] == 0:
-                                candidate = [seq + [j], score + 1000]
-                            else:
-                                candidate = [seq + [j], score - log(row[j])]
-                            all_candidates.append(candidate)
-                        # order all candidates by score
-                        ordered = sorted(all_candidates, key=lambda tup:tup[1])
-                            # select k best
-                        sequences = ordered[:2]
-                        pred_tags = []
-                        for i in sequences[0][0]:
-                            pred_tags.append(self.idx2tag[i])
-                # return( [ sequences[0][0], sequences[1][0], sequences[2][0] ] )
-                return( pred_tags )
+            k = 2
+            idxseq = []
+            for word in sequence:
+                if (word in self.all_words) == True:
+                    idxseq.append(self.lexical[:,self.word2idx[word]])
+                    # data = np.array(idxseq).T
+                else:
+                    idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
+                    # data = np.array(idxseq).T
+            data = np.log(np.array(idxseq))
+            possible_paths = [(0,[self.tag2idx["O"]])]
+            for word_emissions in data[1:]:
+                scores = []
+                for score, pathlist in possible_paths:
+                    previous_pred = pathlist[-1]
+                    transition_array = np.log(self.bigrams[previous_pred,:])
+                    for i, new_score in enumerate(transition_array + word_emissions + score):
+                        scores.append((new_score, pathlist + [i]))
+                scores = sorted(scores, key=lambda tup:tup[0], reverse=True)
+                possible_paths = scores[:k]
+            ret = [self.idx2tag[x] for x in possible_paths[0][1]]
+            return ret
 
-        # Beam Search 3
         if flag == BEAM_3:
-                idxseq = []
-                for word in sequence:
-                    if (word in self.all_words) == True:
-                        idxseq.append(self.lexical[:,self.word2idx[word]])
-                        # data = np.array(idxseq).T
-                    else:
-                        idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
-                        # data = np.array(idxseq).T
-                data = np.array(idxseq)
-                # print( data.T )
-                sequences = [[list(), 0.0]]
-                # walk over each step in sequence
-                for row in data:
-                    all_candidates = list()
-                    # expand each current candidate
-                    for i in range(len(sequences)):
-                        seq, score = sequences[i]
-                        for j in range(len(row)):
-                            if row[j] == 0:
-                                candidate = [seq + [j], score + 1000]
-                            else:
-                                candidate = [seq + [j], score - log(row[j])]
-                            all_candidates.append(candidate)
-                        # order all candidates by score
-                        ordered = sorted(all_candidates, key=lambda tup:tup[1])
-                            # select k best
-                        sequences = ordered[:3]
-                        pred_tags = []
-                        for i in sequences[0][0]:
-                            pred_tags.append(self.idx2tag[i])
-                # return( [ sequences[0][0], sequences[1][0], sequences[2][0] ] )
-                return( pred_tags )
+            k = 2
+            idxseq = []
+            for word in sequence:
+                if (word in self.all_words) == True:
+                    idxseq.append(self.lexical[:,self.word2idx[word]])
+                    # data = np.array(idxseq).T
+                else:
+                    idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
+                    # data = np.array(idxseq).T
+            data = np.log(np.array(idxseq))
+            possible_paths = [(0,[self.tag2idx["O"], self.tag2idx["O"]])]
+            for word_emissions in data[1:]:
+                scores = []
+                for score, pathlist in possible_paths:
+                    previous_pred1 = pathlist[-2]
+                    previous_pred2 = pathlist[-1]
+                    transition_array = np.log(self.trigrams[previous_pred1,previous_pred2,:])
+                    for i, new_score in enumerate(transition_array + word_emissions + score):
+                        scores.append((new_score, pathlist + [i]))
+                scores = sorted(scores, key=lambda tup:tup[0], reverse=True)
+                possible_paths = scores[:k]
+            ret = [self.idx2tag[x] for x in possible_paths[0][1]]
+            ret.remove("O")
+            return ret
+
+
 
         # VITERBI
         ret = []
@@ -403,7 +369,7 @@ if __name__ == "__main__":
     pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
     
     #print(pos_tagger.inference(dev_data[0][2]))
-    print( linear_interpolation(pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams) ) 
+    #print( linear_interpolation(pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams) ) 
 
     # from sklearn.metrics import precision_recall_fscore_support as score
     # predicted = [pos_tagger.inference( dev_data[0][i]) for i in range(len(dev_data[0])) ]
@@ -417,11 +383,11 @@ if __name__ == "__main__":
     # print("And the average fscore is ", round( statistics.mean(fscore), 3))
 
     # # print("")
-    # evaluate( 
-    #     #
-    #     dev_data,
-    #     pos_tagger
-    #  )
+    evaluate( 
+        #
+        dev_data,
+        pos_tagger
+     )
 
 
     #  End of Testing -----------------------------------------------   
