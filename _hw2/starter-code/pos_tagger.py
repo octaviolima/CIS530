@@ -25,7 +25,7 @@ def evaluate(data, model):
     As per the write-up, you may find it faster to use multiprocessing (code included). 
     
     """
-    processes = 10
+    processes = 1
     sentences = data[0]
     tags = data[1]
     n = len(sentences)
@@ -173,8 +173,31 @@ class POSTagger():
                         self.trigrams[idx_first, idx_second, idx_third] = (LAMBDAS[0] * self.unigrams[idx_third,idx_third]) + (LAMBDAS[1] * self.bigrams[idx_second, idx_third]) + (LAMBDAS[2] * self.trigrams[idx_first,idx_second,idx_third])
         pass
 
-    # def get_quadgrams(self):
-        
+    def get_quadgrams(self):
+        """
+        Computes quadgrams. 
+        """
+        self.quadgrams = np.zeros((len(self.all_tags), len(self.all_tags), len(self.all_tags), len(self.all_tags)))
+        for sentence_idx in range(len(self.data[0])):   
+            sentence = self.data[1][sentence_idx]
+            sentence = ["O", "O"] + sentence
+            for word_idx in range(len(sentence) - 3):
+                pos_first = sentence[word_idx]
+                pos_second = sentence[word_idx + 1]
+                pos_third = sentence[word_idx + 2]
+                pos_fourth = sentence[word_idx + 3]
+                idx_first = self.tag2idx[pos_first]
+                idx_second = self.tag2idx[pos_second]
+                idx_third = self.tag2idx[pos_third]
+                idx_fourth = self.tag2idx[pos_fourth]
+                self.quadgrams[idx_first,idx_second,idx_third, idx_fourth] += 1
+        # Smoothing: add 0.00001 to cells
+
+        k = LAPLACE_FACTOR # try big range of values. .001, 2, 5 
+        self.quadgrams = self.quadgrams + k 
+            # diving every row by its sum
+        self.quadgrams = self.quadgrams / self.quadgrams.sum(axis = 3, keepdims = True)
+        np.nan_to_num(self.quadgrams, nan = 0)
     
     def get_emissions(self):
         """
@@ -357,7 +380,7 @@ class POSTagger():
 
         # VITERBI
         ret = []
-        if flag == VITERBI2 or flag == VITERBI3:
+        if flag == VITERBI2 or flag == VITERBI3 or flag == VITERBI4:
             idxseq = []
             for word in sequence:
                 idxseq.append(word)
@@ -367,6 +390,8 @@ class POSTagger():
             # Trigram Viterbi
             elif flag == VITERBI3:
                 x = viterbi3(idxseq, self.trigrams, self.lexical, self.tag2idx, self.word2idx, self.idx2tag)
+            elif flag == VITERBI4:
+                x = viterbi4(idxseq, self.quadgrams, self.lexical, self.tag2idx, self.word2idx, self.idx2tag)
 
             for tag in x:
                 ret.append(self.idx2tag[tag])
@@ -386,14 +411,19 @@ if __name__ == "__main__":
     train_data = pos_tagger.preprocessing(train_data)
     dev_data = pos_tagger.preprocessing(dev_data)
     
-    pos_tagger.train([train_data[0] + dev_data[0], train_data[1] + dev_data[1]])
+    pos_tagger.train(train_data)
+    #pos_tagger.train([train_data[0] + dev_data[0], train_data[1] + dev_data[1]])
 
     # Printing/Testing ----------------------------------------------
     pos_tagger.get_emissions(); 
     pos_tagger.get_unigrams(); pos_tagger.get_bigrams(); 
     pos_tagger.get_trigrams(); 
-    print("finished training")
-    #print(pos_tagger.inference(dev_data[0][2]))
+    pos_tagger.get_quadgrams()
+    #print("finished training")
+    #print(pos_tagger.quadgrams[pos_tagger.tag2idx["O"],pos_tagger.tag2idx["NN"],pos_tagger.tag2idx["VBD"],:])
+    #pos_tagger.inference(dev_data[0][9])
+    # pos_tagger.inference(dev_data[0][9])
+    # print(pos_tagger.inference(["-docstart-", "Fed", "raises", "interest","<STOP>"]))
     #print( linear_interpolation(pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams) ) 
 
     # from sklearn.metrics import precision_recall_fscore_support as score
@@ -408,11 +438,11 @@ if __name__ == "__main__":
     # print("And the average fscore is ", round( statistics.mean(fscore), 3))
 
     # # # print("")
-    # evaluate( 
-    #     #
-    #     dev_data,
-    #     pos_tagger
-    #  )
+    evaluate( 
+        dev_data,
+        #[dev_data[0][5:9], dev_data[1][5:9]],
+        pos_tagger
+     )
 
 
     #predicted = [pos_tagger.inference( test_data[0][i]) for i in range(len(test_data[0])) ]
@@ -426,15 +456,15 @@ if __name__ == "__main__":
     # evaluate(dev_data, pos_tagger)
 
     # Predict tags for the test set
-    test_predictions = []
-    for sentence in test_data:
-        test_predictions.extend(pos_tagger.inference(sentence))
-    test_predictions = ['"' + p + '"' for p in test_predictions if p != "<STOP>"]
-    id = range(len(test_predictions))
-    df = pd.DataFrame(list(zip(id, test_predictions)), columns = ["id", "tags"])
-    # print(test_predictions)
-    # # Write them to a file to update the leaderboard
-    df.to_csv("test_y.csv", index = False)
+    # test_predictions = []
+    # for sentence in test_data:
+    #     test_predictions.extend(pos_tagger.inference(sentence))
+    # test_predictions = ['"' + p + '"' for p in test_predictions if p != "<STOP>"]
+    # id = range(len(test_predictions))
+    # df = pd.DataFrame(list(zip(id, test_predictions)), columns = ["id", "tags"])
+    # # print(test_predictions)
+    # # # Write them to a file to update the leaderboard
+    # df.to_csv("test_y.csv", index = False)
 
 
     #office hours: consider f score, 

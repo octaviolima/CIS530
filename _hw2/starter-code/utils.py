@@ -181,13 +181,13 @@ def viterbi3(y, T, E, tag2idx, word2idx, idx2tag):
     v += float('-inf')
     bp = np.zeros((possible_states,possible_states, length_of_sentence))
     v[tag2idx["O"],tag2idx["O"],0] = 1
-    has_values = [(tag2idx["O"],tag2idx["O"])]
+    has_values = [(tag2idx["O"])]
     if debug:
         print(tag2idx)
     for i in range(1, length_of_sentence):
         new_has_values = set()
         possible = set()
-        for value1,value2 in has_values:
+        for value2 in has_values:
             if y[i] not in word2idx:
                 emissions = np.log(np.array(unknown_words(tag2idx, y[i])))
                 emissions = emissions[np.newaxis,:]
@@ -201,12 +201,12 @@ def viterbi3(y, T, E, tag2idx, word2idx, idx2tag):
             if y[i] in word2idx:
                 for prob_i,prob in enumerate(E[:,word2idx[y[i]]]):
                     if prob> .1:
-                        new_has_values.add((value2,prob_i))
+                        new_has_values.add((prob_i))
                         possible.add(prob_i)
             else:
                 for prob_i,prob in enumerate(unknown_words(tag2idx,y[i])):
                     if prob> .01:
-                        new_has_values.add((value2,prob_i))
+                        new_has_values.add((prob_i))
                         possible.add(prob_i)
         if debug:
             print(y[i],[(idx2tag[valu[0]],idx2tag[valu[1]]) for valu in has_values], [idx2tag[valu] for valu in possible])
@@ -221,6 +221,79 @@ def viterbi3(y, T, E, tag2idx, word2idx, idx2tag):
         curr = int(bp[0,curr,i])
     return ret
     
+
+    
+def viterbi4(y, T, E, tag2idx, word2idx, idx2tag):
+    # y : array (T,)
+    #     Observation state sequence. int dtype.
+    # A : array (K, K, K )
+    #     State transition matrix. See HiddenMarkovModel.state_transition  for
+    #     details.
+    # B : array (K, M)
+    #     Emission matrix. See HiddenMarkovModel.emission for details.
+    # Pi: optional, (K,)
+    #     Initial state probabilities: Pi[i] is the probability x[0] == i. If
+    #     None, uniform initial distribution is assumed (Pi[:] == 1/K).
+    debug = 0
+    log_transition = np.log(T)
+    log_emission = np.log(E)
+    possible_states = T.shape[0]
+    N = T.shape[0]
+    length_of_sentence = len(y)
+    v = np.zeros((possible_states,possible_states,possible_states,length_of_sentence))
+    v += float('-inf')
+    bp = np.zeros((possible_states,possible_states,possible_states, length_of_sentence))
+    v[tag2idx["O"],tag2idx["O"], tag2idx["O"],0] = 1
+    has_values = [(tag2idx["O"], tag2idx["O"])]
+
+
+    for i in range(1, length_of_sentence):
+        new_has_values = set()
+        possible = set()
+        for value2, value3 in has_values:
+            if y[i] not in word2idx:
+                emissions = np.log(np.array(unknown_words(tag2idx, y[i])))
+                emissions = emissions[np.newaxis,:]
+            else:
+                emissions = log_emission[np.newaxis,:,word2idx[y[i]]]
+            transition = log_transition[:,value2,value3,:]
+            prev = v[:,value2,value3, i-1] 
+            v[value2,value3,:,i] = np.max(prev + transition.T + emissions.T, 1)
+            bp[:,value2,value3,i] = np.argmax(prev + transition.T, 1)
+
+            if y[i] in word2idx:
+                for prob_i,prob in enumerate(E[:,word2idx[y[i]]]):
+                    if prob> .1:
+                        new_has_values.add((value3, prob_i))
+                        possible.add(prob_i)
+            else:
+                for prob_i,prob in enumerate(unknown_words(tag2idx,y[i])):
+                    if prob> .01:
+                        new_has_values.add((value3, prob_i))
+                        possible.add(prob_i)
+        if debug:
+            print(y[i],[(idx2tag[valu[0]],idx2tag[valu[1]]) for valu in has_values], [idx2tag[valu] for valu in possible])
+            # if len(possible) == 0:
+            #     print(emissions)
+        has_values = new_has_values
+    ret = np.zeros(length_of_sentence)
+    ret[-1] = tag2idx["<STOP>"]
+    values = np.nan_to_num(v[:,:,tag2idx["<STOP>"],length_of_sentence-1], neginf = -1000000000 ) 
+
+    prev = np.argmax(sum(values))
+    prev2 = np.argmax(values[:,prev])
+    if debug:
+        print(tag2idx)
+    
+    #print(v[:,tag2idx["."], tag2idx["<STOP>"], length_of_sentence-1])
+    # print(values[:,tag2idx["."]])
+    for i in reversed(range(1,length_of_sentence)):
+        ret[i-1] = int(prev)
+        temp = prev2
+        prev2 = int(bp[0,prev2,prev,i])
+        prev = temp
+    print("hey", sum(ret))
+    return ret
 
 def linear_interpolation(unigram_c, bigram_c, trigram_c):
     lambda1 = 0
