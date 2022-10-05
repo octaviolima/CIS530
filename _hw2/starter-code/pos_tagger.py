@@ -1,9 +1,11 @@
 from multiprocessing import Pool
+from matplotlib import test
 import numpy as np
 import time
 from utils import *
 np.set_printoptions(suppress=True) # disable scientific notation
 import string
+import pandas as pd
 
 
 """ Contains the part of speech tagger class. """
@@ -29,7 +31,7 @@ def evaluate(data, model):
     n = len(sentences)
     k = n//processes
     n_tokens = sum([len(d) for d in sentences])
-    # unk_n_tokens = sum([1 for s in sentences for w in s if w not in model.word2idx.keys()])
+    unk_n_tokens = sum([1 for s in sentences for w in s if w not in model.word2idx.keys()])
     predictions = {i:None for i in range(n)}
     probabilities = {i:0 for i in range(n)}
          
@@ -61,7 +63,10 @@ def evaluate(data, model):
 
 
     token_acc = sum([1 for i in range(n) for j in range(len(sentences[i])) if tags[i][j] == predictions[i][j]]) / n_tokens
-    # unk_token_acc = sum([1 for i in range(n) for j in range(len(sentences[i])) if tags[i][j] == predictions[i][j] and sentences[i][j] not in model.word2idx.keys()]) / unk_n_tokens
+    if unk_n_tokens == 0:
+        unk_token_acc = 0
+    else:
+        unk_token_acc = sum([1 for i in range(n) for j in range(len(sentences[i])) if tags[i][j] == predictions[i][j] and sentences[i][j] not in model.word2idx.keys()]) / unk_n_tokens
     whole_sent_acc = 0
     num_whole_sent = 0
     for k in range(n):
@@ -77,7 +82,7 @@ def evaluate(data, model):
     print("Whole sent acc: {}".format(round(whole_sent_acc/num_whole_sent, 3)))
     print("Mean Probabilities: {}".format(round( sum(probabilities.values())/n, 3)) )
     print("Token acc: {}".format(round( token_acc, 3)))
-    # print("Unk token acc: {}".format(unk_token_acc))
+    print("Unk token acc: {}".format(unk_token_acc))
     
     confusion_matrix(pos_tagger.tag2idx, pos_tagger.idx2tag, predictions.values(), tags, 'cm.png')
 
@@ -127,11 +132,14 @@ class POSTagger():
                 idx_second = self.tag2idx[pos_second] 
                 self.bigrams[idx_first,idx_second] += 1
         # Smoothing: add 0.00001 to cells
-        k = .000001 # try big range of values. .001, 2, 5 
+        k = LAPLACE_FACTOR # try big range of values. .001, 2, 5 
         self.bigrams = self.bigrams + k 
+
         # 
         # diving every row by its sum
         self.bigrams = self.bigrams / self.bigrams.sum(axis = 1, keepdims = True)
+        np.nan_to_num(self.bigrams,nan = 0)
+        # np.nan_to_num(self.bigrams, nan = 0)
         pass
 
     def get_trigrams(self):
@@ -152,9 +160,17 @@ class POSTagger():
                 idx_third = self.tag2idx[pos_third]
                 self.trigrams[idx_first,idx_second,idx_third] += 1
         # Smoothing: add 0.00001 to cells
-        self.trigrams = self.trigrams + 0.000001   
-        # diving every row by its sum
+
+        k = LAPLACE_FACTOR # try big range of values. .001, 2, 5 
+        self.trigrams = self.trigrams + k 
+            # diving every row by its sum
         self.trigrams = self.trigrams / self.trigrams.sum(axis = 2, keepdims = True)
+        np.nan_to_num(self.trigrams, nan = 0)
+        if SMOOTHING == INTERPOLATION:
+            for idx_first in range(len(self.all_tags)):
+                for idx_second in range(len(self.all_tags)):
+                    for idx_third in range(len(self.all_tags)):
+                        self.trigrams[idx_first, idx_second, idx_third] = (LAMBDAS[0] * self.unigrams[idx_third,idx_third]) + (LAMBDAS[1] * self.bigrams[idx_second, idx_third]) + (LAMBDAS[2] * self.trigrams[idx_first,idx_second,idx_third])
         pass
 
     # def get_quadgrams(self):
@@ -176,11 +192,13 @@ class POSTagger():
                 idx_word = self.word2idx[word]
                 self.lexical[idx_tag,idx_word] += 1
         # Smoothing: add 0.00001 to cells
-        self.lexical = self.lexical + 0.000001
+
+        k = LAPLACE_FACTOR # try big range of values. .001, 2, 5 
+        self.lexical = self.lexical + k 
         # diving every row by its sum
         self.lexical = self.lexical / self.lexical.sum(axis = 0, keepdims = True)
-
         pass
+    
     def preprocessing(self,data):
         sentence_data = data[0]
         tag_data = data[1]
@@ -191,7 +209,11 @@ class POSTagger():
             new_sentence = []
             new_tags = []
             for n,word in enumerate(sentence):
-                if word not in string.punctuation:
+                if word.replace(",", "").isnumeric():
+                    new_sentence.append("<NUMBER>")
+                    new_tags.append(sentence_tags[n])
+                
+                else:
                     new_sentence.append(word)
                     new_tags.append(sentence_tags[n])
             sentence_data[i] = new_sentence
@@ -237,7 +259,7 @@ class POSTagger():
             - viterbi
         """
         # GREEDY = 0; BEAM_1 = 1; BEAM_2 = 2; BEAM_3 = 3; VITERBI2 = 4; VITERBI3 = 5
-        flag = BEAM_2
+        flag = INFERENCE
 
         # GREEDY
         if flag == GREEDY:
@@ -251,7 +273,7 @@ class POSTagger():
                     # data = np.array(idxseq).T
             data = np.array(idxseq).T
             
-            isbigram = 0
+            isbigram = GREEDY_BI
             if isbigram:
                 # loop through columns to get index of highest value
                 pred_index = []
@@ -282,7 +304,7 @@ class POSTagger():
             return pred_tags
 
         if flag == BEAM_2:
-            k = 2
+            k = BEAM_K
             idxseq = []
             for word in sequence:
                 if (word in self.all_words) == True:
@@ -306,7 +328,7 @@ class POSTagger():
             return ret
 
         if flag == BEAM_3:
-            k = 2
+            k = BEAM_K
             idxseq = []
             for word in sequence:
                 if (word in self.all_words) == True:
@@ -360,14 +382,17 @@ if __name__ == "__main__":
 
     train_data = load_data("data/train_x.csv", "data/train_y.csv")
     dev_data = load_data("data/dev_x.csv", "data/dev_y.csv")
-    # test_data = load_data("data/test_x.csv")
-
-    pos_tagger.train(train_data)
+    test_data = load_data("data/test_x.csv")
+    train_data = pos_tagger.preprocessing(train_data)
+    dev_data = pos_tagger.preprocessing(dev_data)
+    
+    pos_tagger.train([train_data[0] + dev_data[0], train_data[1] + dev_data[1]])
 
     # Printing/Testing ----------------------------------------------
-    pos_tagger.get_emissions(); pos_tagger.get_bigrams(); 
-    pos_tagger.get_trigrams(); pos_tagger.get_unigrams()
-    
+    pos_tagger.get_emissions(); 
+    pos_tagger.get_unigrams(); pos_tagger.get_bigrams(); 
+    pos_tagger.get_trigrams(); 
+    print("finished training")
     #print(pos_tagger.inference(dev_data[0][2]))
     #print( linear_interpolation(pos_tagger.unigrams, pos_tagger.bigrams, pos_tagger.trigrams) ) 
 
@@ -382,13 +407,15 @@ if __name__ == "__main__":
     # print("The average Recall is ", round( statistics.mean(recall), 3))
     # print("And the average fscore is ", round( statistics.mean(fscore), 3))
 
-    # # print("")
-    evaluate( 
-        #
-        dev_data,
-        pos_tagger
-     )
+    # # # print("")
+    # evaluate( 
+    #     #
+    #     dev_data,
+    #     pos_tagger
+    #  )
 
+
+    #predicted = [pos_tagger.inference( test_data[0][i]) for i in range(len(test_data[0])) ]
 
     #  End of Testing -----------------------------------------------   
 
@@ -399,12 +426,15 @@ if __name__ == "__main__":
     # evaluate(dev_data, pos_tagger)
 
     # Predict tags for the test set
-    # test_predictions = []
-    # for sentence in test_data:
-    #     test_predictions.extend(pos_tagger.inference(sentence))
-    
-    # Write them to a file to update the leaderboard
-    # TODO
+    test_predictions = []
+    for sentence in test_data:
+        test_predictions.extend(pos_tagger.inference(sentence))
+    test_predictions = ['"' + p + '"' for p in test_predictions if p != "<STOP>"]
+    id = range(len(test_predictions))
+    df = pd.DataFrame(list(zip(id, test_predictions)), columns = ["id", "tags"])
+    # print(test_predictions)
+    # # Write them to a file to update the leaderboard
+    df.to_csv("test_y.csv", index = False)
 
 
     #office hours: consider f score, 

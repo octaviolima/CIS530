@@ -205,7 +205,7 @@ def viterbi3(y, T, E, tag2idx, word2idx, idx2tag):
                         possible.add(prob_i)
             else:
                 for prob_i,prob in enumerate(unknown_words(tag2idx,y[i])):
-                    if prob> .1:
+                    if prob> .01:
                         new_has_values.add((value2,prob_i))
                         possible.add(prob_i)
         if debug:
