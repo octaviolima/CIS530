@@ -7,4 +7,4 @@ SMOOTHING: which smoothing method to use
 LAPLACE_FACTOR = the amount to add when doing the add k algorithm
 LAMBDAS = the lambdas for the linear interpolation algorithm
 
-then run the file pos_tagger.py and change the file in the evaluate function on line 464 to either train dev or test. 
+then run the file pos_tagger.py by using "python starter-code/pos_tagger.py" and change the file in the evaluate function on line 464 to either train dev or test. 
