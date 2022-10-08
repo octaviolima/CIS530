@@ -1,0 +1,10 @@
+to run this program, simply change the different constants to run certain algorithms 
+
+INFERENCE: type of inference method used
+BEAM_K: k for the beam_k algorithm 
+GREEDY_BI: whether or not greedy is using bigrams
+SMOOTHING: which smoothing method to use
+LAPLACE_FACTOR = the amount to add when doing the add k algorithm
+LAMBDAS = the lambdas for the linear interpolation algorithm
+
+then run the file pos_tagger.py and change the file in the evaluate function on line 464 to either train dev or test. 

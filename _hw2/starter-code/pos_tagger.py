@@ -61,7 +61,30 @@ def evaluate(data, model):
         probabilities.update(a)
     print(f"Probability Estimation Runtime: {round( (time.time()-start)/60, 3)} minutes.")
 
-
+    #print out mispredicted words and their tags and create a dictonary 
+    # missed_word = {}
+    # missed_tags = {}
+    # tags_predicted = {}
+    # for sen_i in range(len(sentences)):
+    #     for word_i in range(len(sentences[sen_i])):
+    #         if predictions[sen_i][word_i] != tags[sen_i][word_i]:
+    #             missed_word[sentences[sen_i][word_i]] = missed_word.get(sentences[sen_i][word_i], 0) + 1
+    #             missed_tags[tags[sen_i][word_i]] = missed_tags.get(tags[sen_i][word_i], 0) + 1
+    #             tags_predicted[tags[sen_i][word_i]] = tags_predicted.get(tags[sen_i][word_i], []) + [predictions[sen_i][word_i]]
+    #             #print(sentences[sen_i][word_i], predictions[sen_i][word_i], tags[sen_i][word_i])
+    # # get sorted list by value
+    
+    # missed_word = sorted(missed_word.items(), key=lambda x: x[1], reverse=True)
+    # missed_tags = sorted(missed_tags.items(), key=lambda x: x[1], reverse=True)
+    # print(missed_word[0:10])
+    # print(missed_tags[0:10])
+    # nnp_dict = {}
+    # for x in tags_predicted["NNP"]:
+    #     nnp_dict[x] = nnp_dict.get(x,0) + 1
+    # nnp_dict = sorted(nnp_dict.items(), key=lambda x: x[1], reverse=True)
+    # print(nnp_dict)
+    
+    # Compute the accuracy of the whole sentences
     token_acc = sum([1 for i in range(n) for j in range(len(sentences[i])) if tags[i][j] == predictions[i][j]]) / n_tokens
     if unk_n_tokens == 0:
         unk_token_acc = 0
