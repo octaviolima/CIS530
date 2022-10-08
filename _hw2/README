@@ -2,7 +2,7 @@ to run this program, simply change the different constants to run certain algori
 
 INFERENCE: type of inference method used
 BEAM_K: k for the beam_k algorithm 
-GREEDY_BI: whether or not greedy is using bigrams
+GREEDY_TYPE: whether or not greedy is using bigrams
 SMOOTHING: which smoothing method to use
 LAPLACE_FACTOR = the amount to add when doing the add k algorithm
 LAMBDAS = the lambdas for the linear interpolation algorithm

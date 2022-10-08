@@ -319,8 +319,8 @@ class POSTagger():
                     # data = np.array(idxseq).T
             data = np.array(idxseq).T
             
-            isbigram = GREEDY_BI
-            if isbigram:
+            type = GREEDY_TYPE
+            if type == GREEDY_BI:
                 # loop through columns to get index of highest value
                 pred_index = []
                 pred_index.append(self.tag2idx["O"])
@@ -329,7 +329,7 @@ class POSTagger():
                     # Bigram
                     transition_array = self.bigrams[previous_pred,:]
                     pred_index.append( (data[:,i] * transition_array).argmax() )
-            else:
+            elif type == GREEDY_TRI:
                 #trigram 
                 pred_index = []
                 pred_index.append(self.tag2idx["O"])
@@ -341,6 +341,18 @@ class POSTagger():
                     pred_index.append((data[:,i] * transition_array).argmax())
 
                 pred_index.remove(self.tag2idx["O"])
+            elif type == GREEDY_QUAD:
+                # quadgram
+                pred_index = []
+                pred_index.append(self.tag2idx["O"])
+                pred_index.append(self.tag2idx["O"])
+                pred_index.append(self.tag2idx["O"])
+                for i in range(1, data.shape[1]):
+                    previous_pred1 = pred_index[-3]
+                    previous_pred2 = pred_index[-2]
+                    previous_pred3 = pred_index[-1]
+                    transition_array = self.quadgrams[previous_pred1,previous_pred2,previous_pred3,:]
+                    pred_index.append((data[:,i] * transition_array).argmax())
 
             # Now that we have index of predicted tag, we get that tag
             pred_tags = []
@@ -349,6 +361,33 @@ class POSTagger():
             # Return predicted tags
             return pred_tags
 
+        if flag == BEAM_4:
+            k = BEAM_K
+            idxseq = []
+            for word in sequence:
+                if (word in self.all_words) == True:
+                    idxseq.append(self.lexical[:,self.word2idx[word]])
+                    # data = np.array(idxseq).T
+                else:
+                    idxseq.append(np.array(unknown_words( self.tag2idx, word)) )  
+                    # data = np.array(idxseq).T
+            data = np.log(np.array(idxseq))
+            possible_paths = [(0,[self.tag2idx["O"], self.tag2idx["O"], self.tag2idx["O"]])]
+            for word_emissions in data[1:]:
+                scores = []
+                for score, pathlist in possible_paths:
+                    previous_pred = pathlist[-3]
+                    previous_pred2 = pathlist[-2]
+                    previous_pred3 = pathlist[-1]
+                    transition_array = np.log(self.quadgrams[previous_pred,previous_pred2,previous_pred3,:])
+                    for i, new_score in enumerate(transition_array + word_emissions + score):
+                        scores.append((new_score, pathlist + [i]))
+                scores = sorted(scores, key=lambda tup:tup[0], reverse=True)
+                possible_paths = scores[:k]
+            ret = [self.idx2tag[x] for x in possible_paths[0][1]]
+            ret.remove("O")
+            ret.remove("O")
+            return ret
         if flag == BEAM_2:
             k = BEAM_K
             idxseq = []
