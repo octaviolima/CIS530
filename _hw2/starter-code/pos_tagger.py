@@ -353,14 +353,14 @@ class POSTagger():
                     previous_pred3 = pred_index[-1]
                     transition_array = self.quadgrams[previous_pred1,previous_pred2,previous_pred3,:]
                     pred_index.append((data[:,i] * transition_array).argmax())
-
+                pred_index.remove(self.tag2idx["O"])
+                pred_index.remove(self.tag2idx["O"])
             # Now that we have index of predicted tag, we get that tag
             pred_tags = []
             for i in pred_index:
                 pred_tags.append(self.idx2tag[i])
             # Return predicted tags
             return pred_tags
-
         if flag == BEAM_4:
             k = BEAM_K
             idxseq = []
